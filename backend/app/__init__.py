@@ -1,0 +1,1 @@
+"""Kakepple Backend Application"""
