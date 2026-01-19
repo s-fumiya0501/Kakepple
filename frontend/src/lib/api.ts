@@ -1,12 +1,8 @@
 import axios from 'axios';
 
-// Production API URL - hardcoded to ensure HTTPS
-const PRODUCTION_API_URL = 'https://kakepple-production.up.railway.app';
-
-// Use production URL unless explicitly overridden for local development
-const API_URL = process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_API_URL
-  ? process.env.NEXT_PUBLIC_API_URL
-  : PRODUCTION_API_URL;
+// API URL - Always use HTTPS in production
+// For local development, change this to http://localhost:8000
+const API_URL = 'https://kakepple-production.up.railway.app';
 
 export const api = axios.create({
   baseURL: API_URL,

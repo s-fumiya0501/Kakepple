@@ -4,9 +4,7 @@ const nextConfig = {
   images: {
     domains: ['lh3.googleusercontent.com'], // For Google profile pictures
   },
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://kakepple-production.up.railway.app',
-  },
+  // Note: API URL is hardcoded in src/lib/api.ts for production
 }
 
 module.exports = nextConfig

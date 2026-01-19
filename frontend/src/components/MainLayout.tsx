@@ -23,11 +23,8 @@ import {
   Settings,
 } from 'lucide-react';
 
-// Production API URL - hardcoded to ensure HTTPS
-const PRODUCTION_API_URL = 'https://kakepple-production.up.railway.app';
-const API_URL = process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_API_URL
-  ? process.env.NEXT_PUBLIC_API_URL
-  : PRODUCTION_API_URL;
+// API URL - Always use HTTPS
+const API_URL = 'https://kakepple-production.up.railway.app';
 import { User } from '@/types';
 import { authApi } from '@/lib/api';
 
