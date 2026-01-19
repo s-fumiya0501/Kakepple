@@ -2,43 +2,39 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { analyticsApi } from '@/lib/api';
 import { CategoryAnalysis } from '@/types';
 import MainLayout from '@/components/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar } from 'lucide-react';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Legend,
-} from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageSkeleton } from '@/components/DashboardSkeleton';
 
 const COLORS = ['#ec4899', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#14b8a6'];
 
+// Lazy load chart components
+const IncomePieChart = dynamic(
+  () => import('@/components/analytics/AnalyticsCharts').then(mod => ({ default: mod.IncomePieChart })),
+  { loading: () => <Skeleton className="h-[300px] w-full" />, ssr: false }
+);
+
+const ExpensePieChart = dynamic(
+  () => import('@/components/analytics/AnalyticsCharts').then(mod => ({ default: mod.ExpensePieChart })),
+  { loading: () => <Skeleton className="h-[300px] w-full" />, ssr: false }
+);
+
+const TopExpenseBarChart = dynamic(
+  () => import('@/components/analytics/AnalyticsCharts').then(mod => ({ default: mod.TopExpenseBarChart })),
+  { loading: () => <Skeleton className="h-[300px] w-full" />, ssr: false }
+);
+
 export default function AnalyticsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const [chartsReady, setChartsReady] = useState(false);
-
-  useEffect(() => {
-    // Delay chart rendering to ensure animations work after hydration
-    const timer = setTimeout(() => {
-      setChartsReady(true);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
   const [scopeFilter, setScopeFilter] = useState<'personal' | 'couple'>('personal');
   const [startDate, setStartDate] = useState(
     new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
@@ -103,9 +99,6 @@ export default function AnalyticsPage() {
     value: parseFloat(item.total),
     color: COLORS[index % COLORS.length],
   })) || [];
-
-  const totalIncome = incomeData.reduce((sum, d) => sum + d.value, 0);
-  const totalExpense = expenseData.reduce((sum, d) => sum + d.value, 0);
 
   // Show skeleton while loading
   if (authLoading || !user) {
@@ -194,32 +187,8 @@ export default function AnalyticsPage() {
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
               収入内訳（円グラフ）
             </h3>
-            {!chartsReady ? (
-              <div className="h-[300px] flex items-center justify-center">
-                <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
-              </div>
-            ) : incomeData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={incomeData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(entry: any) => `${entry.name} (¥${entry.value.toLocaleString()})`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    animationBegin={0}
-                    animationDuration={800}
-                  >
-                    {incomeData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+            {incomeData.length > 0 ? (
+              <IncomePieChart data={incomeData} />
             ) : (
               <p className="text-center text-gray-500 dark:text-gray-400 py-20">データがありません</p>
             )}
@@ -230,32 +199,8 @@ export default function AnalyticsPage() {
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
               支出内訳（円グラフ）
             </h3>
-            {!chartsReady ? (
-              <div className="h-[300px] flex items-center justify-center">
-                <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
-              </div>
-            ) : expenseData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={expenseData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(entry: any) => `${entry.name} (¥${entry.value.toLocaleString()})`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    animationBegin={0}
-                    animationDuration={800}
-                  >
-                    {expenseData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+            {expenseData.length > 0 ? (
+              <ExpensePieChart data={expenseData} />
             ) : (
               <p className="text-center text-gray-500 dark:text-gray-400 py-20">データがありません</p>
             )}
@@ -267,21 +212,8 @@ export default function AnalyticsPage() {
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
             トップ支出カテゴリー（棒グラフ）
           </h3>
-          {!chartsReady ? (
-            <div className="h-[300px] flex items-center justify-center">
-              <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
-            </div>
-          ) : topExpenseData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={topExpenseData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                <Legend />
-                <Bar dataKey="value" fill="#ec4899" name="支出額" animationDuration={800} />
-              </BarChart>
-            </ResponsiveContainer>
+          {topExpenseData.length > 0 ? (
+            <TopExpenseBarChart data={topExpenseData} formatCurrency={formatCurrency} />
           ) : (
             <p className="text-center text-gray-500 dark:text-gray-400 py-20">データがありません</p>
           )}
