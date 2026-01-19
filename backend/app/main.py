@@ -7,10 +7,12 @@ from pathlib import Path
 from app.config import settings
 
 # Create FastAPI application
+# redirect_slashes=False to prevent 307 redirects that change https to http
 app = FastAPI(
     title=settings.APP_NAME,
     description="Couple Budget Management Application",
     version="1.0.0",
+    redirect_slashes=False,
 )
 
 # Configure CORS - must be first middleware added (last to process)
