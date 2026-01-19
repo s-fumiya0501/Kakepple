@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { authApi, OAuthPendingInfo } from "@/lib/api";
+import { authToken } from "@/lib/auth";
 import { AlertCircle, Mail, Lock, User, Heart } from 'lucide-react';
 import ThemeToggle from "@/components/ThemeToggle";
 
@@ -55,12 +56,14 @@ function RegisterForm() {
     setLoading(true);
 
     try {
-      await authApi.register({
+      const response = await authApi.register({
         email,
         password,
         name,
         oauth_pending_id: oauthPendingId || undefined,
       });
+      // Store JWT tokens
+      authToken.setTokens(response.data.access_token, response.data.refresh_token);
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.detail || '登録に失敗しました');

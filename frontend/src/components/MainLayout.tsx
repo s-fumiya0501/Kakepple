@@ -27,6 +27,7 @@ import {
 const API_URL = 'https://kakepple-production.up.railway.app';
 import { User } from '@/types';
 import { authApi } from '@/lib/api';
+import { authToken } from '@/lib/auth';
 
 interface MainLayoutProps {
   user: User;
@@ -42,9 +43,12 @@ export default function MainLayout({ user, children }: MainLayoutProps) {
   const handleLogout = async () => {
     try {
       await authApi.logout();
-      router.push('/');
     } catch (error) {
       console.error('Logout failed:', error);
+    } finally {
+      // Always clear tokens and redirect, even if API call fails
+      authToken.clearTokens();
+      router.push('/');
     }
   };
 

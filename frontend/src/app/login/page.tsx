@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { authApi } from "@/lib/api";
+import { authToken } from "@/lib/auth";
 import { AlertCircle, Mail, Lock, Heart } from 'lucide-react';
 import ThemeToggle from "@/components/ThemeToggle";
 
@@ -22,7 +23,9 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await authApi.login({ email, password });
+      const response = await authApi.login({ email, password });
+      // Store JWT tokens
+      authToken.setTokens(response.data.access_token, response.data.refresh_token);
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'ログインに失敗しました');

@@ -18,7 +18,7 @@ from pathlib import Path
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import UserResponse
-from app.core.security import create_session, delete_session, get_redis_client
+from app.core.security import create_session, delete_session, get_redis_client, create_tokens, verify_token
 from app.core.dependencies import get_current_user
 from app.config import settings
 
@@ -76,6 +76,17 @@ class OAuthPendingResponse(BaseModel):
 
 class UserProfileUpdate(BaseModel):
     name: str | None = None
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user: dict
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
 
 
 # ==================== Helper Functions ====================
@@ -138,26 +149,16 @@ def send_password_reset_email(email: str, token: str):
     print(f"[MOCK EMAIL] Reset URL: {reset_url}")
 
 
-def create_session_and_redirect(user: User, redirect_url: str = None):
-    """Create session and return response with cookie"""
-    session_data = {
-        "user_id": str(user.id),
-        "email": user.email,
-        "name": user.name
-    }
-    session_id = create_session(str(user.id), session_data)
+def create_token_redirect(user: User, redirect_url: str = None):
+    """Create JWT tokens and redirect with tokens in URL fragment"""
+    tokens = create_tokens(str(user.id))
 
-    target_url = redirect_url or f"{settings.FRONTEND_URL}/dashboard"
-    response = RedirectResponse(url=target_url, status_code=302)
-    response.set_cookie(
-        key=settings.SESSION_COOKIE_NAME,
-        value=session_id,
-        max_age=settings.SESSION_MAX_AGE,
-        httponly=True,
-        samesite="none",
-        secure=True
-    )
-    return response
+    # Redirect to frontend with tokens in URL fragment (not query params for security)
+    # Frontend will extract tokens from fragment and store them
+    target_url = redirect_url or f"{settings.FRONTEND_URL}/auth/callback"
+    redirect_with_tokens = f"{target_url}#access_token={tokens['access_token']}&refresh_token={tokens['refresh_token']}"
+
+    return RedirectResponse(url=redirect_with_tokens, status_code=302)
 
 
 # ==================== Email/Password Auth ====================
@@ -207,31 +208,20 @@ async def register(data: RegisterRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    # Create session
-    session_data = {
-        "user_id": str(user.id),
-        "email": user.email,
-        "name": user.name
-    }
-    session_id = create_session(str(user.id), session_data)
+    # Create JWT tokens
+    tokens = create_tokens(str(user.id))
 
-    response = JSONResponse(content={
-        "message": "登録が完了しました",
+    return {
+        "access_token": tokens["access_token"],
+        "refresh_token": tokens["refresh_token"],
+        "token_type": "bearer",
         "user": {
             "id": str(user.id),
             "email": user.email,
-            "name": user.name
+            "name": user.name,
+            "picture_url": user.picture_url
         }
-    })
-    response.set_cookie(
-        key=settings.SESSION_COOKIE_NAME,
-        value=session_id,
-        max_age=settings.SESSION_MAX_AGE,
-        httponly=True,
-        samesite="none",
-        secure=True
-    )
-    return response
+    }
 
 
 @router.post("/login")
@@ -252,31 +242,50 @@ async def login(data: LoginRequest, db: Session = Depends(get_db)):
             detail="メールアドレスまたはパスワードが正しくありません"
         )
 
-    # Create session
-    session_data = {
-        "user_id": str(user.id),
-        "email": user.email,
-        "name": user.name
-    }
-    session_id = create_session(str(user.id), session_data)
+    # Create JWT tokens
+    tokens = create_tokens(str(user.id))
 
-    response = JSONResponse(content={
-        "message": "ログインしました",
+    return {
+        "access_token": tokens["access_token"],
+        "refresh_token": tokens["refresh_token"],
+        "token_type": "bearer",
         "user": {
             "id": str(user.id),
             "email": user.email,
-            "name": user.name
+            "name": user.name,
+            "picture_url": user.picture_url
         }
-    })
-    response.set_cookie(
-        key=settings.SESSION_COOKIE_NAME,
-        value=session_id,
-        max_age=settings.SESSION_MAX_AGE,
-        httponly=True,
-        samesite="none",
-        secure=True
-    )
-    return response
+    }
+
+
+# ==================== Token Refresh ====================
+
+@router.post("/refresh")
+async def refresh_token(data: RefreshTokenRequest, db: Session = Depends(get_db)):
+    """Refresh access token using refresh token"""
+    payload = verify_token(data.refresh_token, token_type="refresh")
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token"
+        )
+
+    user_id = payload.get("sub")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+
+    # Create new tokens
+    tokens = create_tokens(str(user.id))
+
+    return {
+        "access_token": tokens["access_token"],
+        "refresh_token": tokens["refresh_token"],
+        "token_type": "bearer"
+    }
 
 
 # ==================== Password Reset ====================
@@ -406,7 +415,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
                 user.picture_url = picture_url
                 db.commit()
 
-        return create_session_and_redirect(user)
+        return create_token_redirect(user)
 
     except Exception as e:
         raise HTTPException(
@@ -573,7 +582,7 @@ async def line_callback(request: Request, code: str = None, state: str = None, e
                 user.picture_url = picture_url
                 db.commit()
 
-        return create_session_and_redirect(user)
+        return create_token_redirect(user)
 
     except Exception as e:
         raise HTTPException(

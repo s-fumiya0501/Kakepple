@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     SESSION_MAX_AGE: int = 86400 * 7  # 7 days
     PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 24
 
+    # JWT Settings
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
     # Google OAuth
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
