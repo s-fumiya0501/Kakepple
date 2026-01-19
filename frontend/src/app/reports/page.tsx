@@ -1,69 +1,51 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { authApi, analyticsApi, exportApi } from '@/lib/api';
-import { ReportData, User } from '@/types';
+import dynamic from 'next/dynamic';
+import { analyticsApi, exportApi } from '@/lib/api';
+import { ReportData } from '@/types';
 import MainLayout from '@/components/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 import { FileDown, Calendar } from 'lucide-react';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Legend,
-} from 'recharts';
+import { useAuth } from '@/contexts/AuthContext';
+import { PageSkeleton } from '@/components/DashboardSkeleton';
 
 const COLORS = ['#ec4899', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#14b8a6'];
 
+// Lazy load chart components
+const ReportExpensePieChart = dynamic(
+  () => import('@/components/reports/ReportCharts').then(mod => ({ default: mod.ReportExpensePieChart })),
+  { loading: () => <Skeleton className="h-[300px] w-full" />, ssr: false }
+);
+
+const ReportTrendLineChart = dynamic(
+  () => import('@/components/reports/ReportCharts').then(mod => ({ default: mod.ReportTrendLineChart })),
+  { loading: () => <Skeleton className="h-[300px] w-full" />, ssr: false }
+);
+
 export default function ReportsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading: authLoading } = useAuth();
   const [scopeFilter, setScopeFilter] = useState<'personal' | 'couple'>('personal');
   const [period, setPeriod] = useState<'monthly' | 'yearly'>('monthly');
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
   const [report, setReport] = useState<ReportData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [chartsReady, setChartsReady] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
 
+  // Redirect to login if not authenticated
   useEffect(() => {
-    // Delay chart rendering to ensure animations work after hydration
-    const timer = setTimeout(() => {
-      setChartsReady(true);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const userRes = await authApi.me();
-        setUser(userRes.data);
-        setLoading(false);
-      } catch (error) {
-        router.push('/login');
-      }
-    };
-    fetchUser();
-  }, [router]);
-
-  useEffect(() => {
-    if (user) {
-      loadReport();
+    if (!authLoading && !user) {
+      router.push('/login');
     }
-  }, [scopeFilter, period, year, month, user]);
+  }, [authLoading, user, router]);
 
-  const loadReport = async () => {
+  const loadReport = useCallback(async () => {
+    if (!user) return;
     try {
       const response = period === 'monthly'
         ? await analyticsApi.monthlyReport({ year: parseInt(year), month: parseInt(month), scope: scopeFilter })
@@ -71,8 +53,16 @@ export default function ReportsPage() {
       setReport(response.data);
     } catch (err) {
       console.error('Failed to load report:', err);
+    } finally {
+      setDataLoading(false);
     }
-  };
+  }, [user, period, year, month, scopeFilter]);
+
+  useEffect(() => {
+    if (user) {
+      loadReport();
+    }
+  }, [user, loadReport]);
 
   const handleExportCSV = async () => {
     try {
@@ -118,16 +108,25 @@ export default function ReportsPage() {
     expense: parseFloat(item.expense),
   })) || [];
 
-  if (loading) {
+  // Show skeleton while loading
+  if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center items-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
       </div>
     );
   }
 
+  if (dataLoading) {
+    return (
+      <MainLayout user={user}>
+        <PageSkeleton />
+      </MainLayout>
+    );
+  }
+
   return (
-    <MainLayout user={user!}>
+    <MainLayout user={user}>
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -249,32 +248,8 @@ export default function ReportsPage() {
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
               支出カテゴリー（円グラフ）
             </h3>
-            {!chartsReady ? (
-              <div className="h-[300px] flex items-center justify-center">
-                <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
-              </div>
-            ) : expenseData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={expenseData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(entry: any) => `${entry.name} (¥${entry.value.toLocaleString()})`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    animationBegin={0}
-                    animationDuration={800}
-                  >
-                    {expenseData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+            {expenseData.length > 0 ? (
+              <ReportExpensePieChart data={expenseData} />
             ) : (
               <p className="text-center text-gray-500 dark:text-gray-400 py-20">データがありません</p>
             )}
@@ -285,36 +260,8 @@ export default function ReportsPage() {
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
               推移グラフ（折れ線）
             </h3>
-            {!chartsReady ? (
-              <div className="h-[300px] flex items-center justify-center">
-                <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
-              </div>
-            ) : trendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={trendData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="income"
-                    stroke="#10b981"
-                    name="収入"
-                    strokeWidth={2}
-                    animationDuration={800}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="expense"
-                    stroke="#ef4444"
-                    name="支出"
-                    strokeWidth={2}
-                    animationDuration={800}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+            {trendData.length > 0 ? (
+              <ReportTrendLineChart data={trendData} formatCurrency={formatCurrency} />
             ) : (
               <p className="text-center text-gray-500 dark:text-gray-400 py-20">データがありません</p>
             )}

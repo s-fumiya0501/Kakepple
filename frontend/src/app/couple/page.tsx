@@ -14,16 +14,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { authApi, coupleApi } from "@/lib/api";
-import { User, Couple, InviteCode } from "@/types";
+import { coupleApi } from "@/lib/api";
+import { InviteCode } from "@/types";
 import { Heart, Copy, UserPlus, LogOut, Check, Sparkles, PiggyBank, BarChart3, Users } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { PageSkeleton } from "@/components/DashboardSkeleton";
 
 export default function CouplePage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [couple, setCouple] = useState<Couple | null>(null);
+  const { user, couple, loading: authLoading, refreshCouple } = useAuth();
   const [inviteCode, setInviteCode] = useState<InviteCode | null>(null);
-  const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [joining, setJoining] = useState(false);
   const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
@@ -32,28 +32,12 @@ export default function CouplePage() {
   // Form state
   const [inviteCodeInput, setInviteCodeInput] = useState('');
 
+  // Redirect to login if not authenticated
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const userRes = await authApi.me();
-      setUser(userRes.data);
-
-      try {
-        const coupleRes = await coupleApi.getMyCouple();
-        setCouple(coupleRes.data);
-      } catch (error) {
-        setCouple(null);
-      }
-
-      setLoading(false);
-    } catch (error) {
-      console.error('Failed to fetch data:', error);
+    if (!authLoading && !user) {
       router.push('/login');
     }
-  };
+  }, [authLoading, user, router]);
 
   const handleGenerateInviteCode = async () => {
     setGenerating(true);
@@ -80,7 +64,7 @@ export default function CouplePage() {
     try {
       await coupleApi.joinCouple(inviteCodeInput.trim());
       setIsJoinDialogOpen(false);
-      fetchData();
+      if (refreshCouple) refreshCouple();
     } catch (error: any) {
       console.error('Failed to join couple:', error);
       alert(error.response?.data?.detail || 'カップル登録に失敗しました');
@@ -96,7 +80,7 @@ export default function CouplePage() {
 
     try {
       await coupleApi.leaveCouple();
-      setCouple(null);
+      if (refreshCouple) refreshCouple();
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Failed to leave couple:', error);
@@ -128,9 +112,10 @@ export default function CouplePage() {
     });
   };
 
-  if (loading) {
+  // Show skeleton while loading
+  if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center items-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
       </div>
     );
@@ -140,7 +125,7 @@ export default function CouplePage() {
   const partnerInfo = couple?.user1.id === user?.id ? couple?.user2 : couple?.user1;
 
   return (
-    <MainLayout user={user!}>
+    <MainLayout user={user}>
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Header */}
         <div>

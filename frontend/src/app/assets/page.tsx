@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import MainLayout from "@/components/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -15,16 +15,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { authApi, assetApi, Asset, AssetType } from "@/lib/api";
-import { User } from "@/types";
+import { assetApi, Asset, AssetType } from "@/lib/api";
 import { Plus, Pencil, Trash2, PiggyBank } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { PageSkeleton } from "@/components/DashboardSkeleton";
 
 export default function AssetsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading: authLoading } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
 
@@ -35,27 +36,34 @@ export default function AssetsPage() {
   const [formDescription, setFormDescription] = useState('');
   const [formLoading, setFormLoading] = useState(false);
 
+  // Redirect to login if not authenticated
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const userRes = await authApi.me();
-      setUser(userRes.data);
-
-      const typesRes = await assetApi.getTypes();
-      setAssetTypes(typesRes.data.types);
-
-      const assetsRes = await assetApi.list();
-      setAssets(assetsRes.data);
-
-      setLoading(false);
-    } catch (error) {
-      console.error('Failed to fetch data:', error);
+    if (!authLoading && !user) {
       router.push('/login');
     }
-  };
+  }, [authLoading, user, router]);
+
+  const fetchData = useCallback(async () => {
+    if (!user) return;
+    try {
+      const [typesRes, assetsRes] = await Promise.all([
+        assetApi.getTypes(),
+        assetApi.list(),
+      ]);
+      setAssetTypes(typesRes.data.types);
+      setAssets(assetsRes.data);
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+    } finally {
+      setDataLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [user, fetchData]);
 
   const resetForm = () => {
     setFormName('');
@@ -138,16 +146,25 @@ export default function AssetsPage() {
 
   const totalAssets = assets.reduce((sum, asset) => sum + parseFloat(asset.amount), 0);
 
-  if (loading) {
+  // Show skeleton while loading
+  if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center items-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
       </div>
     );
   }
 
+  if (dataLoading) {
+    return (
+      <MainLayout user={user}>
+        <PageSkeleton />
+      </MainLayout>
+    );
+  }
+
   return (
-    <MainLayout user={user!}>
+    <MainLayout user={user}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-start">
