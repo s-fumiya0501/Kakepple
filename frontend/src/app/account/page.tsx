@@ -18,7 +18,7 @@ import { authApi } from '@/lib/api';
 import { User } from '@/types';
 import { Camera, User as UserIcon, Mail, Calendar, Trash2, Edit2, Shield, Save } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://kakepple-production.up.railway.app';
 
 export default function AccountPage() {
   const router = useRouter();

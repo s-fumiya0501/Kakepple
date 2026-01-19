@@ -23,7 +23,7 @@ import {
   Settings,
 } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://kakepple-production.up.railway.app';
 import { User } from '@/types';
 import { authApi } from '@/lib/api';
 
