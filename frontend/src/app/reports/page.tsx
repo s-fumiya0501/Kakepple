@@ -13,18 +13,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { FileDown, Calendar } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageSkeleton } from '@/components/DashboardSkeleton';
+import { PageLoadingSpinner, ChartLoadingSpinner } from '@/components/ui/loading-spinner';
 
 const COLORS = ['#ec4899', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#14b8a6'];
 
 // Lazy load chart components
 const ReportExpensePieChart = dynamic(
   () => import('@/components/reports/ReportCharts').then(mod => ({ default: mod.ReportExpensePieChart })),
-  { loading: () => <Skeleton className="h-[300px] w-full" />, ssr: false }
+  { loading: () => <ChartLoadingSpinner />, ssr: false }
 );
 
 const ReportTrendLineChart = dynamic(
   () => import('@/components/reports/ReportCharts').then(mod => ({ default: mod.ReportTrendLineChart })),
-  { loading: () => <Skeleton className="h-[300px] w-full" />, ssr: false }
+  { loading: () => <ChartLoadingSpinner />, ssr: false }
 );
 
 export default function ReportsPage() {
@@ -108,13 +109,9 @@ export default function ReportsPage() {
     expense: parseFloat(item.expense),
   })) || [];
 
-  // Show skeleton while loading
+  // Show spinner while loading
   if (authLoading || !user) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
-      </div>
-    );
+    return <PageLoadingSpinner />;
   }
 
   if (dataLoading) {

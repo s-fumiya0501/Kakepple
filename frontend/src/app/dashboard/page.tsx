@@ -19,6 +19,7 @@ import { transactionApi, analyticsApi, budgetApi, SavingsData } from "@/lib/api"
 import { TransactionSummary, Transaction, Budget, CategoryBreakdown } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoadingSpinner, ChartLoadingSpinner } from "@/components/ui/loading-spinner";
 import { SummaryCard, BudgetCard, AssetCard } from "@/components/dashboard";
 import {
   TrendingUp,
@@ -51,7 +52,7 @@ import { ja } from 'date-fns/locale';
 const ExpensePieChart = dynamic(
   () => import('@/components/dashboard/DashboardCharts').then(mod => ({ default: mod.ExpensePieChart })),
   {
-    loading: () => <Skeleton className="h-[300px] w-full" />,
+    loading: () => <ChartLoadingSpinner />,
     ssr: false
   }
 );
@@ -59,7 +60,7 @@ const ExpensePieChart = dynamic(
 const MonthlyTrendsChart = dynamic(
   () => import('@/components/dashboard/DashboardCharts').then(mod => ({ default: mod.MonthlyTrendsChart })),
   {
-    loading: () => <Skeleton className="h-[300px] w-full" />,
+    loading: () => <ChartLoadingSpinner />,
     ssr: false
   }
 );
@@ -431,11 +432,7 @@ export default function DashboardPage() {
 
   // Show loading while auth is loading
   if (authLoading || !user) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
-      </div>
-    );
+    return <PageLoadingSpinner />;
   }
 
   return (

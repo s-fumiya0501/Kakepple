@@ -21,6 +21,7 @@ import { INCOME_CATEGORIES, ALL_EXPENSE_CATEGORIES } from "@/types";
 import { Plus, RefreshCw, Edit2, Trash2, Play, Pause, Calendar, Repeat } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { PageSkeleton } from "@/components/DashboardSkeleton";
+import { PageLoadingSpinner } from "@/components/ui/loading-spinner";
 
 const DAYS_OF_WEEK = [
   { value: '0', label: '月曜日' },
@@ -213,13 +214,9 @@ export default function RecurringPage() {
   const activeTransactions = recurringTransactions.filter(t => t.is_active);
   const inactiveTransactions = recurringTransactions.filter(t => !t.is_active);
 
-  // Show skeleton while loading
+  // Show spinner while loading
   if (authLoading || !user) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
-      </div>
-    );
+    return <PageLoadingSpinner />;
   }
 
   if (dataLoading) {

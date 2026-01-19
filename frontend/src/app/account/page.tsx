@@ -17,6 +17,7 @@ import {
 import { authApi } from '@/lib/api';
 import { Camera, User as UserIcon, Mail, Calendar, Trash2, Edit2, Shield, Save } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { PageLoadingSpinner } from '@/components/ui/loading-spinner';
 
 // API URL - Always use HTTPS
 const API_URL = 'https://kakepple-production.up.railway.app';
@@ -140,13 +141,9 @@ export default function AccountPage() {
     return localUser.picture_url;
   };
 
-  // Show loading while auth is loading
+  // Show spinner while auth is loading
   if (authLoading || !authUser) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
-      </div>
-    );
+    return <PageLoadingSpinner />;
   }
 
   // Use localUser for display (which is synced with authUser)

@@ -20,6 +20,7 @@ import {
 import { Plus, Trash2, Target, Wallet, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageSkeleton } from '@/components/DashboardSkeleton';
+import { PageLoadingSpinner } from '@/components/ui/loading-spinner';
 
 export default function BudgetsPage() {
   const router = useRouter();
@@ -133,13 +134,9 @@ export default function BudgetsPage() {
   const currentMonth = budgets.filter(b => b.year === new Date().getFullYear() && b.month === new Date().getMonth() + 1);
   const otherBudgets = budgets.filter(b => !(b.year === new Date().getFullYear() && b.month === new Date().getMonth() + 1));
 
-  // Show skeleton while loading
+  // Show spinner while auth is loading
   if (authLoading || !user) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
-      </div>
-    );
+    return <PageLoadingSpinner />;
   }
 
   if (dataLoading) {

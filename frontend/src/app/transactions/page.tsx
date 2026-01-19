@@ -21,6 +21,7 @@ import { Transaction, INCOME_CATEGORIES, ALL_EXPENSE_CATEGORIES } from "@/types"
 import { Trash2, Plus, Filter } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { PageSkeleton } from "@/components/DashboardSkeleton";
+import { PageLoadingSpinner } from "@/components/ui/loading-spinner";
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -142,13 +143,9 @@ export default function TransactionsPage() {
   const allCategories = [...INCOME_CATEGORIES, ...ALL_EXPENSE_CATEGORIES];
   const availableCategories = formType === 'income' ? INCOME_CATEGORIES : ALL_EXPENSE_CATEGORIES;
 
-  // Show skeleton while loading
+  // Show spinner while auth is loading
   if (authLoading || !user) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
-      </div>
-    );
+    return <PageLoadingSpinner />;
   }
 
   if (dataLoading) {

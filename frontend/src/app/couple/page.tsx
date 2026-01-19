@@ -19,6 +19,7 @@ import { InviteCode } from "@/types";
 import { Heart, Copy, UserPlus, LogOut, Check, Sparkles, PiggyBank, BarChart3, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { PageSkeleton } from "@/components/DashboardSkeleton";
+import { PageLoadingSpinner } from "@/components/ui/loading-spinner";
 
 export default function CouplePage() {
   const router = useRouter();
@@ -112,13 +113,9 @@ export default function CouplePage() {
     });
   };
 
-  // Show skeleton while loading
+  // Show spinner while loading
   if (authLoading || !user) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
-      </div>
-    );
+    return <PageLoadingSpinner />;
   }
 
   const myInfo = couple?.user1.id === user?.id ? couple?.user1 : couple?.user2;
