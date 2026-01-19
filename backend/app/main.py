@@ -1,6 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 from pathlib import Path
 from app.config import settings
@@ -12,15 +13,18 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Add SessionMiddleware (required for OAuth)
+# Configure CORS - must be first middleware added (last to process)
+origins = [
+    "https://kakepple.vercel.app",
+    "http://localhost:3000",
+]
+if settings.FRONTEND_URL not in origins:
+    origins.append(settings.FRONTEND_URL)
+
+# Add SessionMiddleware first (will be inner layer)
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 
-# Configure CORS (added after SessionMiddleware so it processes requests first)
-origins = [
-    settings.FRONTEND_URL,
-    "http://localhost:3000",
-    "https://kakepple.vercel.app",
-]
+# Add CORSMiddleware last (will be outer layer - processes requests first)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -49,6 +53,16 @@ async def root():
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy"}
+
+
+@app.get("/cors-test")
+async def cors_test():
+    """CORS test endpoint"""
+    return {
+        "cors": "working",
+        "frontend_url": settings.FRONTEND_URL,
+        "allowed_origins": origins
+    }
 
 
 # Import and include routers
