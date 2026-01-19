@@ -7,12 +7,10 @@ from pathlib import Path
 from app.config import settings
 
 # Create FastAPI application
-# redirect_slashes=False to prevent 307 redirects that change https to http
 app = FastAPI(
     title=settings.APP_NAME,
     description="Couple Budget Management Application",
     version="1.0.0",
-    redirect_slashes=False,
 )
 
 # Configure CORS - must be first middleware added (last to process)
@@ -22,6 +20,17 @@ origins = [
 ]
 if settings.FRONTEND_URL not in origins:
     origins.append(settings.FRONTEND_URL)
+
+# Middleware to fix HTTPS scheme behind proxy (for proper redirect URLs)
+@app.middleware("http")
+async def fix_scheme_middleware(request: Request, call_next):
+    # Check X-Forwarded-Proto header from proxy
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    if forwarded_proto == "https":
+        # Modify scope to use https scheme
+        request.scope["scheme"] = "https"
+    response = await call_next(request)
+    return response
 
 # Add SessionMiddleware first (will be inner layer)
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
