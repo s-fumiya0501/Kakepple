@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import MainLayout from "@/components/MainLayout";
@@ -14,8 +14,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { authApi, transactionApi, coupleApi, analyticsApi, budgetApi, SavingsData } from "@/lib/api";
-import { User, TransactionSummary, Transaction, Couple, Budget, CategoryBreakdown } from "@/types";
+import { transactionApi, analyticsApi, budgetApi, SavingsData } from "@/lib/api";
+import { TransactionSummary, Transaction, Budget, CategoryBreakdown } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import {
   TrendingUp,
   TrendingDown,
@@ -135,8 +137,7 @@ interface QuickCategory {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [couple, setCouple] = useState<Couple | null>(null);
+  const { user, couple, loading: authLoading } = useAuth();
   const [personalSummary, setPersonalSummary] = useState<TransactionSummary | null>(null);
   const [coupleSummary, setCoupleSummary] = useState<TransactionSummary | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
@@ -145,7 +146,7 @@ export default function DashboardPage() {
   const [personalBudgets, setPersonalBudgets] = useState<Budget[]>([]);
   const [coupleBudgets, setCoupleBudgets] = useState<Budget[]>([]);
   const [savings, setSavings] = useState<SavingsData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
   const [chartsReady, setChartsReady] = useState(false);
 
   // クイック入力用のstate
@@ -183,69 +184,63 @@ export default function DashboardPage() {
     }
   }, []);
 
+  // Redirect to login if not authenticated
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [authLoading, user, router]);
 
-  const fetchData = async () => {
+  // Fetch dashboard data when user is available
+  const fetchData = useCallback(async () => {
+    if (!user) return;
+
+    const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
     try {
-      // Get current user
-      const userRes = await authApi.me();
-      setUser(userRes.data);
+      // Fetch all data in parallel for better performance
+      const [
+        personalSummaryRes,
+        coupleSummaryRes,
+        transactionsRes,
+        categoryRes,
+        trendsRes,
+        personalBudgetRes,
+        coupleBudgetRes,
+        savingsRes
+      ] = await Promise.allSettled([
+        transactionApi.summary({ scope: 'personal' }),
+        couple ? transactionApi.summary({ scope: 'couple' }) : Promise.reject('no couple'),
+        transactionApi.list({ scope: 'personal', limit: 5 }),
+        analyticsApi.categoryAnalysis({ start_date: startDate, end_date: endDate, scope: 'personal' }),
+        analyticsApi.monthlyTrends({ year: now.getFullYear(), scope: 'personal' }),
+        budgetApi.getCurrentStatus('personal'),
+        couple ? budgetApi.getCurrentStatus('couple') : Promise.reject('no couple'),
+        analyticsApi.savings()
+      ]);
 
-      // Get couple info
-      let hasCouple = false;
-      try {
-        const coupleRes = await coupleApi.getMyCouple();
-        setCouple(coupleRes.data);
-        hasCouple = true;
-      } catch (error) {
-        setCouple(null);
+      // Process results
+      if (personalSummaryRes.status === 'fulfilled') {
+        setPersonalSummary(personalSummaryRes.value.data);
       }
 
-      // Get personal summary
-      const personalSummaryRes = await transactionApi.summary({ scope: 'personal' });
-      setPersonalSummary(personalSummaryRes.data);
-
-      // Get couple summary if in a couple
-      if (hasCouple) {
-        try {
-          const coupleSummaryRes = await transactionApi.summary({ scope: 'couple' });
-          setCoupleSummary(coupleSummaryRes.data);
-        } catch (error) {
-          setCoupleSummary(null);
-        }
+      if (coupleSummaryRes.status === 'fulfilled') {
+        setCoupleSummary(coupleSummaryRes.value.data);
       }
 
-      // Get recent transactions
-      const transactionsRes = await transactionApi.list({ scope: 'personal', limit: 5 });
-      setRecentTransactions(transactionsRes.data);
-
-      // Get this month's category analysis for pie chart
-      const now = new Date();
-      const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-
-      try {
-        const categoryRes = await analyticsApi.categoryAnalysis({
-          start_date: startDate,
-          end_date: endDate,
-          scope: 'personal'
-        });
-        setExpenseBreakdown(categoryRes.data.expense_breakdown || []);
-      } catch (error) {
-        setExpenseBreakdown([]);
+      if (transactionsRes.status === 'fulfilled') {
+        setRecentTransactions(transactionsRes.value.data);
       }
 
-      // Get monthly trends for bar chart (last 6 months)
-      try {
-        const trendsRes = await analyticsApi.monthlyTrends({
-          year: now.getFullYear(),
-          scope: 'personal'
-        });
-        // Get last 6 months
+      if (categoryRes.status === 'fulfilled') {
+        setExpenseBreakdown(categoryRes.value.data.expense_breakdown || []);
+      }
+
+      if (trendsRes.status === 'fulfilled') {
         const currentMonth = now.getMonth() + 1;
-        const last6Months = trendsRes.data
+        const last6Months = trendsRes.value.data
           .filter((m: any) => m.month <= currentMonth)
           .slice(-6)
           .map((m: any) => ({
@@ -254,42 +249,31 @@ export default function DashboardPage() {
             支出: parseFloat(m.total_expense)
           }));
         setMonthlyTrends(last6Months);
-      } catch (error) {
-        setMonthlyTrends([]);
       }
 
-      // Get personal budget status
-      try {
-        const budgetRes = await budgetApi.getCurrentStatus('personal');
-        setPersonalBudgets(budgetRes.data || []);
-      } catch (error) {
-        setPersonalBudgets([]);
+      if (personalBudgetRes.status === 'fulfilled') {
+        setPersonalBudgets(personalBudgetRes.value.data || []);
       }
 
-      // Get couple budget status
-      if (hasCouple) {
-        try {
-          const coupleBudgetRes = await budgetApi.getCurrentStatus('couple');
-          setCoupleBudgets(coupleBudgetRes.data || []);
-        } catch (error) {
-          setCoupleBudgets([]);
-        }
+      if (coupleBudgetRes.status === 'fulfilled') {
+        setCoupleBudgets(coupleBudgetRes.value.data || []);
       }
 
-      // Get cumulative savings
-      try {
-        const savingsRes = await analyticsApi.savings();
-        setSavings(savingsRes.data);
-      } catch (error) {
-        setSavings(null);
+      if (savingsRes.status === 'fulfilled') {
+        setSavings(savingsRes.value.data);
       }
-
-      setLoading(false);
     } catch (error) {
-      console.error('Failed to fetch data:', error);
-      router.push('/login');
+      console.error('Failed to fetch dashboard data:', error);
+    } finally {
+      setDataLoading(false);
     }
-  };
+  }, [user, couple]);
+
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [user, fetchData]);
 
   const formatCurrency = (amount: string | number) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -445,7 +429,8 @@ export default function DashboardPage() {
     color: COLORS[index % COLORS.length]
   }));
 
-  if (loading) {
+  // Show loading while auth is loading
+  if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
@@ -453,8 +438,13 @@ export default function DashboardPage() {
     );
   }
 
-  if (!user) {
-    return null;
+  // Show skeleton while data is loading
+  if (dataLoading) {
+    return (
+      <MainLayout user={user}>
+        <DashboardSkeleton />
+      </MainLayout>
+    );
   }
 
   // 収支サマリーカードコンポーネント

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useTheme } from '@/components/ThemeProvider';
 import {
   LayoutDashboard,
@@ -26,8 +26,7 @@ import {
 // API URL - Always use HTTPS
 const API_URL = 'https://kakepple-production.up.railway.app';
 import { User } from '@/types';
-import { authApi } from '@/lib/api';
-import { authToken } from '@/lib/auth';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface MainLayoutProps {
   user: User;
@@ -36,20 +35,12 @@ interface MainLayoutProps {
 
 export default function MainLayout({ user, children }: MainLayoutProps) {
   const pathname = usePathname();
-  const router = useRouter();
+  const { logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
 
   const handleLogout = async () => {
-    try {
-      await authApi.logout();
-    } catch (error) {
-      console.error('Logout failed:', error);
-    } finally {
-      // Always clear tokens and redirect, even if API call fails
-      authToken.clearTokens();
-      router.push('/');
-    }
+    await logout();
   };
 
   const navigation = [

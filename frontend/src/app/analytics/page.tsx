@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { authApi, analyticsApi } from '@/lib/api';
-import { CategoryAnalysis, User } from '@/types';
+import { analyticsApi } from '@/lib/api';
+import { CategoryAnalysis } from '@/types';
 import MainLayout from '@/components/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,12 +22,14 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
+import { useAuth } from '@/contexts/AuthContext';
+import { PageSkeleton } from '@/components/DashboardSkeleton';
 
 const COLORS = ['#ec4899', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#14b8a6'];
 
 export default function AnalyticsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading: authLoading } = useAuth();
   const [chartsReady, setChartsReady] = useState(false);
 
   useEffect(() => {
@@ -43,28 +45,17 @@ export default function AnalyticsPage() {
   );
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [analysis, setAnalysis] = useState<CategoryAnalysis | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
 
+  // Redirect to login if not authenticated
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const userRes = await authApi.me();
-        setUser(userRes.data);
-        setLoading(false);
-      } catch (error) {
-        router.push('/login');
-      }
-    };
-    fetchUser();
-  }, [router]);
-
-  useEffect(() => {
-    if (user) {
-      loadAnalysis();
+    if (!authLoading && !user) {
+      router.push('/login');
     }
-  }, [scopeFilter, startDate, endDate, user]);
+  }, [authLoading, user, router]);
 
-  const loadAnalysis = async () => {
+  const loadAnalysis = useCallback(async () => {
+    if (!user) return;
     try {
       const response = await analyticsApi.categoryAnalysis({
         start_date: startDate,
@@ -74,8 +65,16 @@ export default function AnalyticsPage() {
       setAnalysis(response.data);
     } catch (err) {
       console.error('Failed to load analysis:', err);
+    } finally {
+      setDataLoading(false);
     }
-  };
+  }, [user, startDate, endDate, scopeFilter]);
+
+  useEffect(() => {
+    if (user) {
+      loadAnalysis();
+    }
+  }, [user, loadAnalysis]);
 
   const formatCurrency = (value: string | number) => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -108,16 +107,25 @@ export default function AnalyticsPage() {
   const totalIncome = incomeData.reduce((sum, d) => sum + d.value, 0);
   const totalExpense = expenseData.reduce((sum, d) => sum + d.value, 0);
 
-  if (loading) {
+  // Show skeleton while loading
+  if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center items-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
       </div>
     );
   }
 
+  if (dataLoading) {
+    return (
+      <MainLayout user={user}>
+        <PageSkeleton />
+      </MainLayout>
+    );
+  }
+
   return (
-    <MainLayout user={user!}>
+    <MainLayout user={user}>
       <div className="space-y-6">
         {/* Header */}
         <div>

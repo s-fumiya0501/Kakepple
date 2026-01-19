@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import MainLayout from "@/components/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -16,16 +16,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { authApi, transactionApi, coupleApi } from "@/lib/api";
-import { User, Transaction, Couple, INCOME_CATEGORIES, ALL_EXPENSE_CATEGORIES } from "@/types";
+import { transactionApi } from "@/lib/api";
+import { Transaction, INCOME_CATEGORIES, ALL_EXPENSE_CATEGORIES } from "@/types";
 import { Trash2, Plus, Filter } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { PageSkeleton } from "@/components/DashboardSkeleton";
 
 export default function TransactionsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [couple, setCouple] = useState<Couple | null>(null);
+  const { user, couple, loading: authLoading } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Filter state
@@ -42,36 +43,16 @@ export default function TransactionsPage() {
   const [formIsSplit, setFormIsSplit] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
 
+  // Redirect to login if not authenticated
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-      fetchTransactions();
-    }
-  }, [scopeFilter, typeFilter, categoryFilter, user]);
-
-  const fetchData = async () => {
-    try {
-      const userRes = await authApi.me();
-      setUser(userRes.data);
-
-      try {
-        const coupleRes = await coupleApi.getMyCouple();
-        setCouple(coupleRes.data);
-      } catch (error) {
-        setCouple(null);
-      }
-
-      setLoading(false);
-    } catch (error) {
-      console.error('Failed to fetch data:', error);
+    if (!authLoading && !user) {
       router.push('/login');
     }
-  };
+  }, [authLoading, user, router]);
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
+    if (!user) return;
+
     try {
       const params: any = {};
 
@@ -91,8 +72,16 @@ export default function TransactionsPage() {
       setTransactions(res.data);
     } catch (error) {
       console.error('Failed to fetch transactions:', error);
+    } finally {
+      setDataLoading(false);
     }
-  };
+  }, [user, scopeFilter, typeFilter, categoryFilter]);
+
+  useEffect(() => {
+    if (user) {
+      fetchTransactions();
+    }
+  }, [user, fetchTransactions]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('このトランザクションを削除しますか？')) {
@@ -153,16 +142,25 @@ export default function TransactionsPage() {
   const allCategories = [...INCOME_CATEGORIES, ...ALL_EXPENSE_CATEGORIES];
   const availableCategories = formType === 'income' ? INCOME_CATEGORIES : ALL_EXPENSE_CATEGORIES;
 
-  if (loading) {
+  // Show skeleton while loading
+  if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center items-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
       </div>
     );
   }
 
+  if (dataLoading) {
+    return (
+      <MainLayout user={user}>
+        <PageSkeleton />
+      </MainLayout>
+    );
+  }
+
   return (
-    <MainLayout user={user!}>
+    <MainLayout user={user}>
       <div className="space-y-6">
         {/* Header */}
         <div>

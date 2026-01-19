@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { authApi, budgetApi } from '@/lib/api';
-import { Budget, ALL_EXPENSE_CATEGORIES, User } from '@/types';
+import { budgetApi } from '@/lib/api';
+import { Budget, ALL_EXPENSE_CATEGORIES } from '@/types';
 import MainLayout from '@/components/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,16 +16,17 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import { Plus, Trash2, Target, Wallet, AlertTriangle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { PageSkeleton } from '@/components/DashboardSkeleton';
 
 export default function BudgetsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading: authLoading } = useAuth();
   const [scope, setScope] = useState<'personal' | 'couple'>('personal');
   const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Form state
@@ -36,33 +37,30 @@ export default function BudgetsPage() {
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [formLoading, setFormLoading] = useState(false);
 
+  // Redirect to login if not authenticated
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const userRes = await authApi.me();
-        setUser(userRes.data);
-        setLoading(false);
-      } catch (error) {
-        router.push('/login');
-      }
-    };
-    fetchUser();
-  }, [router]);
-
-  useEffect(() => {
-    if (user) {
-      loadBudgets();
+    if (!authLoading && !user) {
+      router.push('/login');
     }
-  }, [scope, user]);
+  }, [authLoading, user, router]);
 
-  const loadBudgets = async () => {
+  const loadBudgets = useCallback(async () => {
+    if (!user) return;
     try {
       const response = await budgetApi.list({ scope });
       setBudgets(response.data);
     } catch (err: any) {
       console.error('Failed to load budgets:', err);
+    } finally {
+      setDataLoading(false);
     }
-  };
+  }, [user, scope]);
+
+  useEffect(() => {
+    if (user) {
+      loadBudgets();
+    }
+  }, [user, loadBudgets]);
 
   const resetForm = () => {
     setBudgetType('monthly_total');
@@ -135,16 +133,25 @@ export default function BudgetsPage() {
   const currentMonth = budgets.filter(b => b.year === new Date().getFullYear() && b.month === new Date().getMonth() + 1);
   const otherBudgets = budgets.filter(b => !(b.year === new Date().getFullYear() && b.month === new Date().getMonth() + 1));
 
-  if (loading) {
+  // Show skeleton while loading
+  if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center items-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
       </div>
     );
   }
 
+  if (dataLoading) {
+    return (
+      <MainLayout user={user}>
+        <PageSkeleton />
+      </MainLayout>
+    );
+  }
+
   return (
-    <MainLayout user={user!}>
+    <MainLayout user={user}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-start">
