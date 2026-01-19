@@ -154,8 +154,8 @@ def create_session_and_redirect(user: User, redirect_url: str = None):
         value=session_id,
         max_age=settings.SESSION_MAX_AGE,
         httponly=True,
-        samesite="lax",
-        secure=not settings.DEBUG
+        samesite="none",
+        secure=True
     )
     return response
 
@@ -228,8 +228,8 @@ async def register(data: RegisterRequest, db: Session = Depends(get_db)):
         value=session_id,
         max_age=settings.SESSION_MAX_AGE,
         httponly=True,
-        samesite="lax",
-        secure=not settings.DEBUG
+        samesite="none",
+        secure=True
     )
     return response
 
@@ -273,8 +273,8 @@ async def login(data: LoginRequest, db: Session = Depends(get_db)):
         value=session_id,
         max_age=settings.SESSION_MAX_AGE,
         httponly=True,
-        samesite="lax",
-        secure=not settings.DEBUG
+        samesite="none",
+        secure=True
     )
     return response
 
