@@ -71,11 +71,11 @@ export default function NewTransactionPage() {
         is_split: isSplit && couple !== null,
       });
 
-      alert('トランザクションを登録しました');
+      alert('取引を登録しました');
       router.push('/transactions');
     } catch (error: any) {
       console.error('Failed to create transaction:', error);
-      alert(error.response?.data?.detail || 'トランザクションの登録に失敗しました');
+      alert(error.response?.data?.detail || '取引の登録に失敗しました');
       setSubmitting(false);
     }
   };
@@ -94,13 +94,13 @@ export default function NewTransactionPage() {
     <MainLayout user={user!}>
       <div className="max-w-2xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">トランザクション登録</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">取引登録</h1>
           <p className="text-gray-600 dark:text-gray-300 mt-2">収入または支出を記録します</p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>トランザクション情報</CardTitle>
+            <CardTitle>取引情報</CardTitle>
             <CardDescription>必要な情報を入力してください</CardDescription>
           </CardHeader>
           <CardContent>

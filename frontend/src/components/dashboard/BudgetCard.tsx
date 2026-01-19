@@ -23,7 +23,7 @@ function BudgetCardComponent({ budgetInfo, gradient, formatCurrency }: BudgetCar
     <div className={`rounded-lg ${gradient} p-4 text-white`}>
       <div className="flex items-center gap-2 mb-2">
         <Target className="h-4 w-4" />
-        <h4 className="font-semibold text-sm">残り予算</h4>
+        <h4 className="font-semibold text-sm">月次支出目標</h4>
       </div>
       <p className="text-2xl font-bold">{formatCurrency(budgetInfo.remaining)}</p>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">

@@ -44,6 +44,7 @@ import {
   BookOpen,
   Shirt,
   Zap,
+  Target,
 } from 'lucide-react';
 import { format, endOfMonth } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -697,6 +698,51 @@ export default function DashboardPage() {
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+          <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+            クイックアクセス
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Link
+              href="/transactions"
+              className="flex items-center gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+            >
+              <div className="rounded-full bg-pink-100 p-2 dark:bg-pink-900">
+                <TrendingDown className="h-5 w-5 text-pink-600 dark:text-pink-400" />
+              </div>
+              <span className="font-medium text-gray-900 dark:text-white">取引一覧</span>
+            </Link>
+            <Link
+              href="/budgets"
+              className="flex items-center gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+            >
+              <div className="rounded-full bg-emerald-100 p-2 dark:bg-emerald-900">
+                <Target className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <span className="font-medium text-gray-900 dark:text-white">予算管理</span>
+            </Link>
+            <Link
+              href="/analytics"
+              className="flex items-center gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+            >
+              <div className="rounded-full bg-purple-100 p-2 dark:bg-purple-900">
+                <TrendingUp className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <span className="font-medium text-gray-900 dark:text-white">分析</span>
+            </Link>
+            <Link
+              href="/assets"
+              className="flex items-center gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+            >
+              <div className="rounded-full bg-amber-100 p-2 dark:bg-amber-900">
+                <PiggyBank className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <span className="font-medium text-gray-900 dark:text-white">資産管理</span>
+            </Link>
           </div>
         </div>
 
