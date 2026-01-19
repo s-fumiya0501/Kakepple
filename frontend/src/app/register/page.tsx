@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { authApi, OAuthPendingInfo } from "@/lib/api";
 import { AlertCircle, Mail, Lock, User, Heart } from 'lucide-react';
 import ThemeToggle from "@/components/ThemeToggle";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const oauthPendingId = searchParams.get('oauth_pending');
@@ -308,5 +308,17 @@ export default function RegisterPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
+        <div className="text-gray-600 dark:text-gray-400">読み込み中...</div>
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }
