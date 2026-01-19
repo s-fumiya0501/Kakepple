@@ -85,7 +85,7 @@ export default function TransactionsPage() {
   }, [user, fetchTransactions]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm('このトランザクションを削除しますか？')) {
+    if (!confirm('この取引を削除しますか？')) {
       return;
     }
 
@@ -94,7 +94,7 @@ export default function TransactionsPage() {
       fetchTransactions();
     } catch (error) {
       console.error('Failed to delete transaction:', error);
-      alert('トランザクションの削除に失敗しました');
+      alert('取引の削除に失敗しました');
     }
   };
 
@@ -233,14 +233,14 @@ export default function TransactionsPage() {
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl">
                   <DialogHeader>
-                    <DialogTitle className="text-2xl">トランザクション登録</DialogTitle>
+                    <DialogTitle className="text-2xl">取引登録</DialogTitle>
                     <p className="text-sm text-gray-600 dark:text-gray-400">収入または支出を記録します</p>
                   </DialogHeader>
 
                   <div className="mt-6 space-y-6">
                     {/* Transaction Info */}
                     <div>
-                      <h3 className="text-lg font-semibold mb-3 dark:text-white">トランザクション情報</h3>
+                      <h3 className="text-lg font-semibold mb-3 dark:text-white">取引情報</h3>
                       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                         必要な情報を入力してください
                       </p>
@@ -394,26 +394,26 @@ export default function TransactionsPage() {
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                     日付
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     カテゴリー
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
                     説明
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden sm:table-cell">
                     種類
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-3 md:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     金額
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
                     範囲
                   </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    操作
+                  <th className="px-2 md:px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+
                   </th>
                 </tr>
               </thead>
@@ -421,59 +421,65 @@ export default function TransactionsPage() {
                 {transactions.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                      トランザクションがありません
+                      取引がありません
                     </td>
                   </tr>
                 ) : (
-                  transactions.map((transaction) => (
-                    <tr key={transaction.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {transaction.date}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200">
-                          {transaction.category}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-300 hidden md:table-cell">
-                        {transaction.description || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            transaction.type === 'income'
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}
-                        >
-                          {transaction.type === 'income' ? '収入' : '支出'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                        <span
-                          className={
-                            transaction.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                          }
-                        >
-                          {transaction.type === 'income' ? '+' : '-'}
-                          {formatCurrency(transaction.amount)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center hidden md:table-cell">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {transaction.is_split ? 'カップル' : '個人'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <button
-                          onClick={() => handleDelete(transaction.id)}
-                          className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  transactions.map((transaction) => {
+                    const date = new Date(transaction.date);
+                    const formattedDate = `${date.getMonth() + 1}/${date.getDate()}`;
+                    const fullDate = transaction.date;
+                    return (
+                      <tr key={transaction.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="px-3 md:px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                          <span className="md:hidden">{formattedDate}</span>
+                          <span className="hidden md:inline">{fullDate}</span>
+                        </td>
+                        <td className="px-3 md:px-6 py-4 whitespace-nowrap">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200">
+                            {transaction.category}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-300 hidden md:table-cell">
+                          {transaction.description || '-'}
+                        </td>
+                        <td className="px-3 md:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              transaction.type === 'income'
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}
+                          >
+                            {transaction.type === 'income' ? '収入' : '支出'}
+                          </span>
+                        </td>
+                        <td className="px-3 md:px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
+                          <span
+                            className={
+                              transaction.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                            }
+                          >
+                            {transaction.type === 'income' ? '+' : '-'}
+                            {formatCurrency(transaction.amount)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center hidden md:table-cell">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {transaction.is_split ? 'カップル' : '個人'}
+                          </span>
+                        </td>
+                        <td className="px-2 md:px-6 py-4 whitespace-nowrap text-center">
+                          <button
+                            onClick={() => handleDelete(transaction.id)}
+                            className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

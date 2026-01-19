@@ -318,7 +318,7 @@ export default function BudgetsPage() {
                     <p className="text-2xl font-bold">
                       {formatCurrency(parseFloat(budget.amount) - parseFloat(budget.current_spent || '0'))}
                     </p>
-                    <p className="text-sm opacity-90">残り予算</p>
+                    <p className="text-sm opacity-90">残り目標額</p>
                   </div>
 
                   <div className="space-y-2">
