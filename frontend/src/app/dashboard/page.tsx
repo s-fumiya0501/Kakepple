@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import MainLayout from "@/components/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,8 @@ import {
 import { transactionApi, analyticsApi, budgetApi, SavingsData } from "@/lib/api";
 import { TransactionSummary, Transaction, Budget, CategoryBreakdown } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
-import { DashboardSkeleton } from "@/components/DashboardSkeleton";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SummaryCard, BudgetCard, AssetCard } from "@/components/dashboard";
 import {
   TrendingUp,
   TrendingDown,
@@ -30,7 +32,6 @@ import {
   Sparkles,
   PiggyBank,
   Users,
-  Target,
   Plus,
   X,
   Settings,
@@ -43,23 +44,27 @@ import {
   Shirt,
   Zap,
 } from 'lucide-react';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend
-} from 'recharts';
 import { format, endOfMonth } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
-// カテゴリ別の色
+// Lazy load chart components for better performance
+const ExpensePieChart = dynamic(
+  () => import('@/components/dashboard/DashboardCharts').then(mod => ({ default: mod.ExpensePieChart })),
+  {
+    loading: () => <Skeleton className="h-[300px] w-full" />,
+    ssr: false
+  }
+);
+
+const MonthlyTrendsChart = dynamic(
+  () => import('@/components/dashboard/DashboardCharts').then(mod => ({ default: mod.MonthlyTrendsChart })),
+  {
+    loading: () => <Skeleton className="h-[300px] w-full" />,
+    ssr: false
+  }
+);
+
+// Category colors
 const COLORS = [
   '#ec4899', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b',
   '#ef4444', '#6366f1', '#14b8a6', '#84cc16', '#6b7280'
@@ -71,7 +76,7 @@ interface MonthlyTrendData {
   支出: number;
 }
 
-// デフォルトのクイック入力用カテゴリ
+// Default quick input categories
 const defaultQuickCategories = [
   { name: '食費', icon: 'ShoppingCart', color: 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300' },
   { name: '日用品', icon: 'Package', color: 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300' },
@@ -80,26 +85,13 @@ const defaultQuickCategories = [
   { name: '娯楽費', icon: 'Sparkles', color: 'bg-pink-100 text-pink-600 dark:bg-pink-900 dark:text-pink-300' },
 ];
 
-// アイコンマッピング
+// Icon mapping
 const iconMap: { [key: string]: any } = {
-  ShoppingCart,
-  Package,
-  Car,
-  Coffee,
-  Sparkles,
-  Utensils,
-  Home,
-  Smartphone,
-  Gift,
-  Plane,
-  BookOpen,
-  Shirt,
-  Zap,
-  Heart,
-  Target,
+  ShoppingCart, Package, Car, Coffee, Sparkles, Utensils, Home,
+  Smartphone, Gift, Plane, BookOpen, Shirt, Zap, Heart,
 };
 
-// 利用可能なアイコンリスト
+// Available icons list
 const availableIcons = [
   { name: 'ShoppingCart', label: '買い物' },
   { name: 'Utensils', label: '食事' },
@@ -117,7 +109,7 @@ const availableIcons = [
   { name: 'Heart', label: 'ハート' },
 ];
 
-// 利用可能なカラー
+// Available colors
 const availableColors = [
   { value: 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300', label: '赤' },
   { value: 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300', label: '青' },
@@ -135,9 +127,20 @@ interface QuickCategory {
   color: string;
 }
 
+// Loading state for each section
+interface LoadingState {
+  summary: boolean;
+  budgets: boolean;
+  savings: boolean;
+  charts: boolean;
+  transactions: boolean;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user, couple, loading: authLoading } = useAuth();
+
+  // Data states
   const [personalSummary, setPersonalSummary] = useState<TransactionSummary | null>(null);
   const [coupleSummary, setCoupleSummary] = useState<TransactionSummary | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
@@ -146,38 +149,36 @@ export default function DashboardPage() {
   const [personalBudgets, setPersonalBudgets] = useState<Budget[]>([]);
   const [coupleBudgets, setCoupleBudgets] = useState<Budget[]>([]);
   const [savings, setSavings] = useState<SavingsData | null>(null);
-  const [dataLoading, setDataLoading] = useState(true);
-  const [chartsReady, setChartsReady] = useState(false);
 
-  // クイック入力用のstate
+  // Progressive loading state - each section loads independently
+  const [loading, setLoading] = useState<LoadingState>({
+    summary: true,
+    budgets: true,
+    savings: true,
+    charts: true,
+    transactions: true,
+  });
+
+  // Quick input states
   const [quickInputOpen, setQuickInputOpen] = useState(false);
   const [quickInputCategory, setQuickInputCategory] = useState('');
   const [quickInputAmount, setQuickInputAmount] = useState('');
   const [quickInputDescription, setQuickInputDescription] = useState('');
   const [quickInputLoading, setQuickInputLoading] = useState(false);
 
-  // カスタムカテゴリ管理用のstate
+  // Custom category states
   const [quickCategories, setQuickCategories] = useState<QuickCategory[]>(defaultQuickCategories);
   const [categorySettingsOpen, setCategorySettingsOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryIcon, setNewCategoryIcon] = useState('ShoppingCart');
   const [newCategoryColor, setNewCategoryColor] = useState(availableColors[0].value);
 
-  useEffect(() => {
-    // Delay chart rendering to ensure animations work after hydration
-    const timer = setTimeout(() => {
-      setChartsReady(true);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
-
   // Load custom categories from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('quickCategories');
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        setQuickCategories(parsed);
+        setQuickCategories(JSON.parse(saved));
       } catch (e) {
         console.error('Failed to parse saved categories:', e);
       }
@@ -191,103 +192,121 @@ export default function DashboardPage() {
     }
   }, [authLoading, user, router]);
 
-  // Fetch dashboard data when user is available
-  const fetchData = useCallback(async () => {
+  // Fetch data progressively - each section fetches independently
+  useEffect(() => {
     if (!user) return;
 
     const now = new Date();
     const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
-    try {
-      // Fetch all data in parallel for better performance
-      const [
-        personalSummaryRes,
-        coupleSummaryRes,
-        transactionsRes,
-        categoryRes,
-        trendsRes,
-        personalBudgetRes,
-        coupleBudgetRes,
-        savingsRes
-      ] = await Promise.allSettled([
-        transactionApi.summary({ scope: 'personal' }),
-        couple ? transactionApi.summary({ scope: 'couple' }) : Promise.reject('no couple'),
-        transactionApi.list({ scope: 'personal', limit: 5 }),
-        analyticsApi.categoryAnalysis({ start_date: startDate, end_date: endDate, scope: 'personal' }),
-        analyticsApi.monthlyTrends({ year: now.getFullYear(), scope: 'personal' }),
-        budgetApi.getCurrentStatus('personal'),
-        couple ? budgetApi.getCurrentStatus('couple') : Promise.reject('no couple'),
-        analyticsApi.savings()
-      ]);
-
-      // Process results
-      if (personalSummaryRes.status === 'fulfilled') {
-        setPersonalSummary(personalSummaryRes.value.data);
+    // Fetch summary (highest priority - shows first)
+    const fetchSummary = async () => {
+      try {
+        const [personalRes, coupleRes] = await Promise.allSettled([
+          transactionApi.summary({ scope: 'personal' }),
+          couple ? transactionApi.summary({ scope: 'couple' }) : Promise.reject('no couple'),
+        ]);
+        if (personalRes.status === 'fulfilled') setPersonalSummary(personalRes.value.data);
+        if (coupleRes.status === 'fulfilled') setCoupleSummary(coupleRes.value.data);
+      } catch (e) {
+        console.error('Failed to fetch summary:', e);
+      } finally {
+        setLoading(prev => ({ ...prev, summary: false }));
       }
+    };
 
-      if (coupleSummaryRes.status === 'fulfilled') {
-        setCoupleSummary(coupleSummaryRes.value.data);
+    // Fetch budgets
+    const fetchBudgets = async () => {
+      try {
+        const [personalRes, coupleRes] = await Promise.allSettled([
+          budgetApi.getCurrentStatus('personal'),
+          couple ? budgetApi.getCurrentStatus('couple') : Promise.reject('no couple'),
+        ]);
+        if (personalRes.status === 'fulfilled') setPersonalBudgets(personalRes.value.data || []);
+        if (coupleRes.status === 'fulfilled') setCoupleBudgets(coupleRes.value.data || []);
+      } catch (e) {
+        console.error('Failed to fetch budgets:', e);
+      } finally {
+        setLoading(prev => ({ ...prev, budgets: false }));
       }
+    };
 
-      if (transactionsRes.status === 'fulfilled') {
-        setRecentTransactions(transactionsRes.value.data);
+    // Fetch savings
+    const fetchSavings = async () => {
+      try {
+        const res = await analyticsApi.savings();
+        setSavings(res.data);
+      } catch (e) {
+        console.error('Failed to fetch savings:', e);
+      } finally {
+        setLoading(prev => ({ ...prev, savings: false }));
       }
+    };
 
-      if (categoryRes.status === 'fulfilled') {
-        setExpenseBreakdown(categoryRes.value.data.expense_breakdown || []);
-      }
+    // Fetch charts data (lower priority - can load later)
+    const fetchCharts = async () => {
+      try {
+        const [categoryRes, trendsRes] = await Promise.allSettled([
+          analyticsApi.categoryAnalysis({ start_date: startDate, end_date: endDate, scope: 'personal' }),
+          analyticsApi.monthlyTrends({ year: now.getFullYear(), scope: 'personal' }),
+        ]);
 
-      if (trendsRes.status === 'fulfilled') {
-        const currentMonth = now.getMonth() + 1;
-        const last6Months = trendsRes.value.data
-          .filter((m: any) => m.month <= currentMonth)
-          .slice(-6)
-          .map((m: any) => ({
-            month: m.month_name,
-            収入: parseFloat(m.total_income),
-            支出: parseFloat(m.total_expense)
-          }));
-        setMonthlyTrends(last6Months);
-      }
+        if (categoryRes.status === 'fulfilled') {
+          setExpenseBreakdown(categoryRes.value.data.expense_breakdown || []);
+        }
 
-      if (personalBudgetRes.status === 'fulfilled') {
-        setPersonalBudgets(personalBudgetRes.value.data || []);
+        if (trendsRes.status === 'fulfilled') {
+          const currentMonth = now.getMonth() + 1;
+          const last6Months = trendsRes.value.data
+            .filter((m: any) => m.month <= currentMonth)
+            .slice(-6)
+            .map((m: any) => ({
+              month: m.month_name,
+              収入: parseFloat(m.total_income),
+              支出: parseFloat(m.total_expense)
+            }));
+          setMonthlyTrends(last6Months);
+        }
+      } catch (e) {
+        console.error('Failed to fetch charts:', e);
+      } finally {
+        setLoading(prev => ({ ...prev, charts: false }));
       }
+    };
 
-      if (coupleBudgetRes.status === 'fulfilled') {
-        setCoupleBudgets(coupleBudgetRes.value.data || []);
+    // Fetch recent transactions
+    const fetchTransactions = async () => {
+      try {
+        const res = await transactionApi.list({ scope: 'personal', limit: 5 });
+        setRecentTransactions(res.data);
+      } catch (e) {
+        console.error('Failed to fetch transactions:', e);
+      } finally {
+        setLoading(prev => ({ ...prev, transactions: false }));
       }
+    };
 
-      if (savingsRes.status === 'fulfilled') {
-        setSavings(savingsRes.value.data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch dashboard data:', error);
-    } finally {
-      setDataLoading(false);
-    }
+    // Start all fetches in parallel
+    fetchSummary();
+    fetchBudgets();
+    fetchSavings();
+    fetchCharts();
+    fetchTransactions();
   }, [user, couple]);
 
-  useEffect(() => {
-    if (user) {
-      fetchData();
-    }
-  }, [user, fetchData]);
-
-  const formatCurrency = (amount: string | number) => {
+  const formatCurrency = useCallback((amount: string | number) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
     return `¥${num.toLocaleString()}`;
-  };
+  }, []);
 
-  // カテゴリを保存
-  const saveCategories = (categories: QuickCategory[]) => {
+  // Category management functions
+  const saveCategories = useCallback((categories: QuickCategory[]) => {
     setQuickCategories(categories);
     localStorage.setItem('quickCategories', JSON.stringify(categories));
-  };
+  }, []);
 
-  // カテゴリを追加
-  const addCategory = () => {
+  const addCategory = useCallback(() => {
     if (!newCategoryName.trim()) return;
     const newCategory: QuickCategory = {
       name: newCategoryName.trim(),
@@ -298,29 +317,25 @@ export default function DashboardPage() {
     setNewCategoryName('');
     setNewCategoryIcon('ShoppingCart');
     setNewCategoryColor(availableColors[0].value);
-  };
+  }, [newCategoryName, newCategoryIcon, newCategoryColor, quickCategories, saveCategories]);
 
-  // カテゴリを削除
-  const removeCategory = (index: number) => {
+  const removeCategory = useCallback((index: number) => {
     const updated = quickCategories.filter((_, i) => i !== index);
     saveCategories(updated);
-  };
+  }, [quickCategories, saveCategories]);
 
-  // デフォルトにリセット
-  const resetCategories = () => {
+  const resetCategories = useCallback(() => {
     saveCategories(defaultQuickCategories);
-  };
+  }, [saveCategories]);
 
-  // クイック入力を開く
-  const openQuickInput = (category: string) => {
+  const openQuickInput = useCallback((category: string) => {
     setQuickInputCategory(category);
     setQuickInputAmount('');
     setQuickInputDescription('');
     setQuickInputOpen(true);
-  };
+  }, []);
 
-  // クイック入力で登録
-  const handleQuickSubmit = async () => {
+  const handleQuickSubmit = useCallback(async () => {
     if (!quickInputAmount || parseFloat(quickInputAmount) <= 0) return;
 
     setQuickInputLoading(true);
@@ -338,17 +353,23 @@ export default function DashboardPage() {
       setQuickInputOpen(false);
       setQuickInputAmount('');
       setQuickInputDescription('');
-      // データを再取得
-      fetchData();
+
+      // Refresh summary and transactions
+      const [summaryRes, transactionsRes] = await Promise.allSettled([
+        transactionApi.summary({ scope: 'personal' }),
+        transactionApi.list({ scope: 'personal', limit: 5 }),
+      ]);
+      if (summaryRes.status === 'fulfilled') setPersonalSummary(summaryRes.value.data);
+      if (transactionsRes.status === 'fulfilled') setRecentTransactions(transactionsRes.value.data);
     } catch (error) {
       console.error('Failed to create transaction:', error);
       alert('登録に失敗しました');
     } finally {
       setQuickInputLoading(false);
     }
-  };
+  }, [quickInputAmount, quickInputCategory, quickInputDescription]);
 
-  // 個人の残り予算情報
+  // Budget info calculations
   const personalBudgetInfo = useMemo(() => {
     const monthlyBudget = personalBudgets.find(b => b.budget_type === 'monthly_total');
     if (!monthlyBudget) return null;
@@ -363,17 +384,9 @@ export default function DashboardPage() {
     const dailyBudget = remaining > 0 ? remaining / remainingDays : 0;
     const percentUsed = total > 0 ? (used / total) * 100 : 0;
 
-    return {
-      total,
-      used,
-      remaining,
-      dailyBudget,
-      remainingDays,
-      percentUsed,
-    };
+    return { total, used, remaining, dailyBudget, remainingDays, percentUsed };
   }, [personalBudgets]);
 
-  // カップルの残り予算情報
   const coupleBudgetInfo = useMemo(() => {
     const monthlyBudget = coupleBudgets.find(b => b.budget_type === 'monthly_total');
     if (!monthlyBudget) return null;
@@ -388,21 +401,11 @@ export default function DashboardPage() {
     const dailyBudget = remaining > 0 ? remaining / remainingDays : 0;
     const percentUsed = total > 0 ? (used / total) * 100 : 0;
 
-    return {
-      total,
-      used,
-      remaining,
-      dailyBudget,
-      remainingDays,
-      percentUsed,
-    };
+    return { total, used, remaining, dailyBudget, remainingDays, percentUsed };
   }, [coupleBudgets]);
 
-  // 今月の個人収支
   const personalStats = useMemo(() => {
-    if (!personalSummary) {
-      return { income: 0, expense: 0, balance: 0 };
-    }
+    if (!personalSummary) return { income: 0, expense: 0, balance: 0 };
     return {
       income: parseFloat(personalSummary.total_income),
       expense: parseFloat(personalSummary.total_expense),
@@ -410,11 +413,8 @@ export default function DashboardPage() {
     };
   }, [personalSummary]);
 
-  // 今月のカップル収支
   const coupleStats = useMemo(() => {
-    if (!coupleSummary) {
-      return { income: 0, expense: 0, balance: 0 };
-    }
+    if (!coupleSummary) return { income: 0, expense: 0, balance: 0 };
     return {
       income: parseFloat(coupleSummary.total_income),
       expense: parseFloat(coupleSummary.total_expense),
@@ -422,12 +422,12 @@ export default function DashboardPage() {
     };
   }, [coupleSummary]);
 
-  // Pie chart data
-  const pieData = expenseBreakdown.map((item, index) => ({
-    name: item.category,
-    value: parseFloat(item.total),
-    color: COLORS[index % COLORS.length]
-  }));
+  const pieData = useMemo(() =>
+    expenseBreakdown.map((item, index) => ({
+      name: item.category,
+      value: parseFloat(item.total),
+      color: COLORS[index % COLORS.length]
+    })), [expenseBreakdown]);
 
   // Show loading while auth is loading
   if (authLoading || !user) {
@@ -438,106 +438,10 @@ export default function DashboardPage() {
     );
   }
 
-  // Show skeleton while data is loading
-  if (dataLoading) {
-    return (
-      <MainLayout user={user}>
-        <DashboardSkeleton />
-      </MainLayout>
-    );
-  }
-
-  // 収支サマリーカードコンポーネント
-  const SummaryCard = ({
-    label,
-    value,
-    icon: Icon,
-    colorClass,
-    bgClass
-  }: {
-    label: string;
-    value: number;
-    icon: any;
-    colorClass: string;
-    bgClass: string;
-  }) => (
-    <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-gray-600 dark:text-gray-400">{label}</p>
-          <p className={`mt-1 text-lg font-bold ${colorClass}`}>
-            {formatCurrency(value)}
-          </p>
-        </div>
-        <div className={`rounded-full p-2 ${bgClass}`}>
-          <Icon className={`h-4 w-4 ${colorClass}`} />
-        </div>
-      </div>
-    </div>
-  );
-
-  // 予算カードコンポーネント
-  const BudgetCard = ({ budgetInfo, gradient }: { budgetInfo: any; gradient: string }) => (
-    <div className={`rounded-lg ${gradient} p-4 text-white`}>
-      <div className="flex items-center gap-2 mb-2">
-        <Target className="h-4 w-4" />
-        <h4 className="font-semibold text-sm">残り予算</h4>
-      </div>
-      <p className="text-2xl font-bold">{formatCurrency(budgetInfo.remaining)}</p>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-        <div>
-          <p className="opacity-75">1日あたり</p>
-          <p className="font-semibold">{formatCurrency(Math.floor(budgetInfo.dailyBudget))}</p>
-        </div>
-        <div>
-          <p className="opacity-75">残り日数</p>
-          <p className="font-semibold">{budgetInfo.remainingDays}日</p>
-        </div>
-      </div>
-      <div className="mt-3">
-        <div className="h-1.5 overflow-hidden rounded-full bg-white/30">
-          <div
-            className="h-full bg-white"
-            style={{ width: `${Math.min(budgetInfo.percentUsed, 100)}%` }}
-          />
-        </div>
-        <p className="mt-1 text-xs opacity-75">
-          {formatCurrency(budgetInfo.used)} / {formatCurrency(budgetInfo.total)}
-        </p>
-      </div>
-    </div>
-  );
-
-  // 資産カードコンポーネント
-  const AssetCard = ({
-    label,
-    value,
-    subLabel,
-    subValue,
-    icon: Icon,
-    gradient
-  }: {
-    label: string;
-    value: string | number;
-    subLabel: string;
-    subValue: string;
-    icon: any;
-    gradient: string;
-  }) => (
-    <div className={`rounded-lg ${gradient} p-4 text-white`}>
-      <div className="flex items-center gap-2 mb-2">
-        <Icon className="h-4 w-4" />
-        <h4 className="font-semibold text-sm">{label}</h4>
-      </div>
-      <p className="text-xl font-bold">{formatCurrency(value)}</p>
-      <p className="text-xs opacity-75 mt-1">{subLabel} ({subValue})</p>
-    </div>
-  );
-
   return (
     <MainLayout user={user}>
       <div className="space-y-6">
-        {/* ヘッダー */}
+        {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             ダッシュボード
@@ -547,9 +451,9 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* メイン: 個人とカップルの2カラムレイアウト */}
+        {/* Main: Personal and Couple 2-column layout */}
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* 個人セクション */}
+          {/* Personal Section */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
               <div className="rounded-full bg-emerald-100 p-1.5 dark:bg-emerald-900">
@@ -558,11 +462,14 @@ export default function DashboardPage() {
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">個人</h2>
             </div>
 
-            {/* 予算 */}
-            {personalBudgetInfo ? (
+            {/* Budget */}
+            {loading.budgets ? (
+              <Skeleton className="h-40 rounded-lg" />
+            ) : personalBudgetInfo ? (
               <BudgetCard
                 budgetInfo={personalBudgetInfo}
                 gradient="bg-gradient-to-r from-emerald-500 to-teal-600"
+                formatCurrency={formatCurrency}
               />
             ) : (
               <div className="rounded-lg bg-gray-100 dark:bg-gray-800 p-4 text-center">
@@ -573,33 +480,49 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* 収入・支出・残高 */}
-            <div className="grid gap-3 grid-cols-3">
-              <SummaryCard
-                label="収入"
-                value={personalStats.income}
-                icon={TrendingUp}
-                colorClass="text-green-600 dark:text-green-400"
-                bgClass="bg-green-100 dark:bg-green-900"
-              />
-              <SummaryCard
-                label="支出"
-                value={personalStats.expense}
-                icon={TrendingDown}
-                colorClass="text-red-600 dark:text-red-400"
-                bgClass="bg-red-100 dark:bg-red-900"
-              />
-              <SummaryCard
-                label="残高"
-                value={personalStats.balance}
-                icon={Wallet}
-                colorClass={personalStats.balance >= 0 ? "text-blue-600 dark:text-blue-400" : "text-orange-600 dark:text-orange-400"}
-                bgClass="bg-blue-100 dark:bg-blue-900"
-              />
-            </div>
+            {/* Income/Expense/Balance */}
+            {loading.summary ? (
+              <div className="grid gap-3 grid-cols-3">
+                <Skeleton className="h-24 rounded-lg" />
+                <Skeleton className="h-24 rounded-lg" />
+                <Skeleton className="h-24 rounded-lg" />
+              </div>
+            ) : (
+              <div className="grid gap-3 grid-cols-3">
+                <SummaryCard
+                  label="収入"
+                  value={personalStats.income}
+                  icon={TrendingUp}
+                  colorClass="text-green-600 dark:text-green-400"
+                  bgClass="bg-green-100 dark:bg-green-900"
+                  formatCurrency={formatCurrency}
+                />
+                <SummaryCard
+                  label="支出"
+                  value={personalStats.expense}
+                  icon={TrendingDown}
+                  colorClass="text-red-600 dark:text-red-400"
+                  bgClass="bg-red-100 dark:bg-red-900"
+                  formatCurrency={formatCurrency}
+                />
+                <SummaryCard
+                  label="残高"
+                  value={personalStats.balance}
+                  icon={Wallet}
+                  colorClass={personalStats.balance >= 0 ? "text-blue-600 dark:text-blue-400" : "text-orange-600 dark:text-orange-400"}
+                  bgClass="bg-blue-100 dark:bg-blue-900"
+                  formatCurrency={formatCurrency}
+                />
+              </div>
+            )}
 
-            {/* 純資産 */}
-            {savings && (
+            {/* Assets */}
+            {loading.savings ? (
+              <div className="grid gap-3 grid-cols-2">
+                <Skeleton className="h-28 rounded-lg" />
+                <Skeleton className="h-28 rounded-lg" />
+              </div>
+            ) : savings && (
               <div className="grid gap-3 grid-cols-2">
                 <AssetCard
                   label="使用可能"
@@ -608,6 +531,7 @@ export default function DashboardPage() {
                   subValue="収入-支出"
                   icon={Wallet}
                   gradient="bg-gradient-to-r from-cyan-500 to-blue-600"
+                  formatCurrency={formatCurrency}
                 />
                 <AssetCard
                   label="総資産"
@@ -616,12 +540,13 @@ export default function DashboardPage() {
                   subValue={`¥${parseFloat(savings.personal_assets_total).toLocaleString()}`}
                   icon={PiggyBank}
                   gradient="bg-gradient-to-r from-amber-500 to-orange-600"
+                  formatCurrency={formatCurrency}
                 />
               </div>
             )}
           </div>
 
-          {/* カップルセクション */}
+          {/* Couple Section */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
               <div className="rounded-full bg-pink-100 p-1.5 dark:bg-pink-900">
@@ -632,11 +557,14 @@ export default function DashboardPage() {
 
             {couple ? (
               <>
-                {/* 予算 */}
-                {coupleBudgetInfo ? (
+                {/* Budget */}
+                {loading.budgets ? (
+                  <Skeleton className="h-40 rounded-lg" />
+                ) : coupleBudgetInfo ? (
                   <BudgetCard
                     budgetInfo={coupleBudgetInfo}
                     gradient="bg-gradient-to-r from-pink-500 to-purple-600"
+                    formatCurrency={formatCurrency}
                   />
                 ) : (
                   <div className="rounded-lg bg-gray-100 dark:bg-gray-800 p-4 text-center">
@@ -647,33 +575,49 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* 収入・支出・残高 */}
-                <div className="grid gap-3 grid-cols-3">
-                  <SummaryCard
-                    label="収入"
-                    value={coupleStats.income}
-                    icon={TrendingUp}
-                    colorClass="text-green-600 dark:text-green-400"
-                    bgClass="bg-green-100 dark:bg-green-900"
-                  />
-                  <SummaryCard
-                    label="支出"
-                    value={coupleStats.expense}
-                    icon={TrendingDown}
-                    colorClass="text-red-600 dark:text-red-400"
-                    bgClass="bg-red-100 dark:bg-red-900"
-                  />
-                  <SummaryCard
-                    label="残高"
-                    value={coupleStats.balance}
-                    icon={Wallet}
-                    colorClass={coupleStats.balance >= 0 ? "text-blue-600 dark:text-blue-400" : "text-orange-600 dark:text-orange-400"}
-                    bgClass="bg-blue-100 dark:bg-blue-900"
-                  />
-                </div>
+                {/* Income/Expense/Balance */}
+                {loading.summary ? (
+                  <div className="grid gap-3 grid-cols-3">
+                    <Skeleton className="h-24 rounded-lg" />
+                    <Skeleton className="h-24 rounded-lg" />
+                    <Skeleton className="h-24 rounded-lg" />
+                  </div>
+                ) : (
+                  <div className="grid gap-3 grid-cols-3">
+                    <SummaryCard
+                      label="収入"
+                      value={coupleStats.income}
+                      icon={TrendingUp}
+                      colorClass="text-green-600 dark:text-green-400"
+                      bgClass="bg-green-100 dark:bg-green-900"
+                      formatCurrency={formatCurrency}
+                    />
+                    <SummaryCard
+                      label="支出"
+                      value={coupleStats.expense}
+                      icon={TrendingDown}
+                      colorClass="text-red-600 dark:text-red-400"
+                      bgClass="bg-red-100 dark:bg-red-900"
+                      formatCurrency={formatCurrency}
+                    />
+                    <SummaryCard
+                      label="残高"
+                      value={coupleStats.balance}
+                      icon={Wallet}
+                      colorClass={coupleStats.balance >= 0 ? "text-blue-600 dark:text-blue-400" : "text-orange-600 dark:text-orange-400"}
+                      bgClass="bg-blue-100 dark:bg-blue-900"
+                      formatCurrency={formatCurrency}
+                    />
+                  </div>
+                )}
 
-                {/* 純資産 */}
-                {savings && savings.has_couple && savings.couple_balance !== null && (
+                {/* Assets */}
+                {loading.savings ? (
+                  <div className="grid gap-3 grid-cols-2">
+                    <Skeleton className="h-28 rounded-lg" />
+                    <Skeleton className="h-28 rounded-lg" />
+                  </div>
+                ) : savings && savings.has_couple && savings.couple_balance !== null && (
                   <div className="grid gap-3 grid-cols-2">
                     <AssetCard
                       label="使用可能"
@@ -682,6 +626,7 @@ export default function DashboardPage() {
                       subValue="収入-支出"
                       icon={Users}
                       gradient="bg-gradient-to-r from-pink-500 to-rose-600"
+                      formatCurrency={formatCurrency}
                     />
                     <AssetCard
                       label="総資産"
@@ -690,6 +635,7 @@ export default function DashboardPage() {
                       subValue={`¥${parseFloat(savings.couple_assets_total || '0').toLocaleString()}`}
                       icon={PiggyBank}
                       gradient="bg-gradient-to-r from-violet-500 to-purple-600"
+                      formatCurrency={formatCurrency}
                     />
                   </div>
                 )}
@@ -718,7 +664,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* クイック入力 */}
+        {/* Quick Input */}
         <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -757,81 +703,34 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* グラフ */}
+        {/* Charts */}
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* 支出円グラフ */}
+          {/* Expense Pie Chart */}
           <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
             <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
               今月のカテゴリー別支出
             </h2>
-            {!chartsReady ? (
-              <div className="h-[300px] flex items-center justify-center">
-                <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
-              </div>
-            ) : pieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, value }: any) =>
-                      `${name} (¥${value.toLocaleString()})`
-                    }
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    animationBegin={0}
-                    animationDuration={800}
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+            {loading.charts ? (
+              <Skeleton className="h-[300px] w-full" />
             ) : (
-              <div className="flex h-[300px] items-center justify-center text-gray-500 dark:text-gray-400">
-                今月の支出データがありません
-              </div>
+              <ExpensePieChart data={pieData} formatCurrency={formatCurrency} />
             )}
           </div>
 
-          {/* 月次推移グラフ */}
+          {/* Monthly Trends Chart */}
           <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
             <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
               月次推移（過去6ヶ月）
             </h2>
-            {!chartsReady ? (
-              <div className="h-[300px] flex items-center justify-center">
-                <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
-              </div>
-            ) : monthlyTrends.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={monthlyTrends}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                  <Legend />
-                  <Bar dataKey="収入" fill="#10b981" animationDuration={800} />
-                  <Bar dataKey="支出" fill="#ef4444" animationDuration={800} />
-                </BarChart>
-              </ResponsiveContainer>
+            {loading.charts ? (
+              <Skeleton className="h-[300px] w-full" />
             ) : (
-              <div className="flex h-[300px] items-center justify-center text-gray-500 dark:text-gray-400">
-                収支データがありません
-              </div>
+              <MonthlyTrendsChart data={monthlyTrends} formatCurrency={formatCurrency} />
             )}
           </div>
         </div>
 
-        {/* 最近の取引 */}
+        {/* Recent Transactions */}
         <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -844,7 +743,25 @@ export default function DashboardPage() {
               すべて表示
             </Link>
           </div>
-          {recentTransactions.length > 0 ? (
+          {loading.transactions ? (
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center justify-between border-b border-gray-100 pb-3 last:border-0 dark:border-gray-700">
+                  <div className="flex items-center">
+                    <Skeleton className="h-10 w-10 rounded-full mr-3" />
+                    <div>
+                      <Skeleton className="h-5 w-20" />
+                      <Skeleton className="h-4 w-32 mt-1" />
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-4 w-10 mt-1" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : recentTransactions.length > 0 ? (
             <div className="space-y-3">
               {recentTransactions.map((transaction) => (
                 <div
@@ -932,7 +849,7 @@ export default function DashboardPage() {
                 autoFocus
               />
             </div>
-            {/* 金額サジェスト */}
+            {/* Amount suggestions */}
             <div className="flex gap-2">
               {[500, 1000, 2000, 5000].map((amount) => (
                 <button
@@ -944,7 +861,7 @@ export default function DashboardPage() {
                 </button>
               ))}
             </div>
-            {/* 内容入力 */}
+            {/* Description input */}
             <div>
               <label className="text-sm text-gray-600 dark:text-gray-400 mb-1 block">
                 内容（任意）
@@ -993,7 +910,7 @@ export default function DashboardPage() {
             </DialogDescription>
           </DialogHeader>
 
-          {/* 現在のカテゴリ一覧 */}
+          {/* Current categories list */}
           <div className="py-4">
             <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
               登録済みカテゴリ
@@ -1030,13 +947,13 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 新規カテゴリ追加 */}
+          {/* Add new category */}
           <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
             <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
               新規カテゴリを追加
             </h4>
             <div className="space-y-3">
-              {/* カテゴリ名 */}
+              {/* Category name */}
               <div>
                 <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">
                   カテゴリ名
@@ -1049,7 +966,7 @@ export default function DashboardPage() {
                 />
               </div>
 
-              {/* アイコン選択 */}
+              {/* Icon selection */}
               <div>
                 <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">
                   アイコン
@@ -1075,7 +992,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* カラー選択 */}
+              {/* Color selection */}
               <div>
                 <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">
                   カラー
@@ -1096,7 +1013,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* プレビュー */}
+              {/* Preview */}
               {newCategoryName && (
                 <div className="pt-2">
                   <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">
