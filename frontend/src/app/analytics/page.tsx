@@ -13,23 +13,24 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageSkeleton } from '@/components/DashboardSkeleton';
+import { PageLoadingSpinner, ChartLoadingSpinner } from '@/components/ui/loading-spinner';
 
 const COLORS = ['#ec4899', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#14b8a6'];
 
 // Lazy load chart components
 const IncomePieChart = dynamic(
   () => import('@/components/analytics/AnalyticsCharts').then(mod => ({ default: mod.IncomePieChart })),
-  { loading: () => <Skeleton className="h-[300px] w-full" />, ssr: false }
+  { loading: () => <ChartLoadingSpinner />, ssr: false }
 );
 
 const ExpensePieChart = dynamic(
   () => import('@/components/analytics/AnalyticsCharts').then(mod => ({ default: mod.ExpensePieChart })),
-  { loading: () => <Skeleton className="h-[300px] w-full" />, ssr: false }
+  { loading: () => <ChartLoadingSpinner />, ssr: false }
 );
 
 const TopExpenseBarChart = dynamic(
   () => import('@/components/analytics/AnalyticsCharts').then(mod => ({ default: mod.TopExpenseBarChart })),
-  { loading: () => <Skeleton className="h-[300px] w-full" />, ssr: false }
+  { loading: () => <ChartLoadingSpinner />, ssr: false }
 );
 
 export default function AnalyticsPage() {
@@ -100,13 +101,9 @@ export default function AnalyticsPage() {
     color: COLORS[index % COLORS.length],
   })) || [];
 
-  // Show skeleton while loading
+  // Show spinner while loading
   if (authLoading || !user) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
-      </div>
-    );
+    return <PageLoadingSpinner />;
   }
 
   if (dataLoading) {
