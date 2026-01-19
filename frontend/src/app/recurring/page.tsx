@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import MainLayout from "@/components/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { authApi, recurringApi, coupleApi, RecurringTransaction, RecurringTransactionCreate } from "@/lib/api";
-import { User, Couple, INCOME_CATEGORIES, ALL_EXPENSE_CATEGORIES } from "@/types";
+import { recurringApi, RecurringTransaction, RecurringTransactionCreate } from "@/lib/api";
+import { INCOME_CATEGORIES, ALL_EXPENSE_CATEGORIES } from "@/types";
 import { Plus, RefreshCw, Edit2, Trash2, Play, Pause, Calendar, Repeat } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { PageSkeleton } from "@/components/DashboardSkeleton";
 
 const DAYS_OF_WEEK = [
   { value: '0', label: '月曜日' },
@@ -32,10 +34,9 @@ const DAYS_OF_WEEK = [
 
 export default function RecurringPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [couple, setCouple] = useState<Couple | null>(null);
+  const { user, couple, loading: authLoading } = useAuth();
   const [recurringTransactions, setRecurringTransactions] = useState<RecurringTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -50,32 +51,30 @@ export default function RecurringPage() {
   const [formIsSplit, setFormIsSplit] = useState<boolean>(false);
   const [formLoading, setFormLoading] = useState(false);
 
+  // Redirect to login if not authenticated
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const userRes = await authApi.me();
-      setUser(userRes.data);
-
-      // Get couple info
-      try {
-        const coupleRes = await coupleApi.getMyCouple();
-        setCouple(coupleRes.data);
-      } catch (error) {
-        setCouple(null);
-      }
-
-      const recurringRes = await recurringApi.list();
-      setRecurringTransactions(recurringRes.data);
-
-      setLoading(false);
-    } catch (error) {
-      console.error('Failed to fetch data:', error);
+    if (!authLoading && !user) {
       router.push('/login');
     }
-  };
+  }, [authLoading, user, router]);
+
+  const fetchData = useCallback(async () => {
+    if (!user) return;
+    try {
+      const recurringRes = await recurringApi.list();
+      setRecurringTransactions(recurringRes.data);
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+    } finally {
+      setDataLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [user, fetchData]);
 
   const resetForm = () => {
     setFormType('expense');
@@ -214,16 +213,25 @@ export default function RecurringPage() {
   const activeTransactions = recurringTransactions.filter(t => t.is_active);
   const inactiveTransactions = recurringTransactions.filter(t => !t.is_active);
 
-  if (loading) {
+  // Show skeleton while loading
+  if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center items-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
       </div>
     );
   }
 
+  if (dataLoading) {
+    return (
+      <MainLayout user={user}>
+        <PageSkeleton />
+      </MainLayout>
+    );
+  }
+
   return (
-    <MainLayout user={user!}>
+    <MainLayout user={user}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-start">

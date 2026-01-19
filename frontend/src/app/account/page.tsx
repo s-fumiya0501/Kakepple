@@ -15,16 +15,16 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { authApi } from '@/lib/api';
-import { User } from '@/types';
 import { Camera, User as UserIcon, Mail, Calendar, Trash2, Edit2, Shield, Save } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 // API URL - Always use HTTPS
 const API_URL = 'https://kakepple-production.up.railway.app';
 
 export default function AccountPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user: authUser, loading: authLoading, refreshUser } = useAuth();
+  const [localUser, setLocalUser] = useState(authUser);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -33,21 +33,20 @@ export default function AccountPage() {
   // Form state
   const [editName, setEditName] = useState('');
 
+  // Redirect to login if not authenticated
   useEffect(() => {
-    fetchUser();
-  }, []);
-
-  const fetchUser = async () => {
-    try {
-      const res = await authApi.me();
-      setUser(res.data);
-      setEditName(res.data.name || '');
-      setLoading(false);
-    } catch (error) {
-      console.error('Failed to fetch user:', error);
+    if (!authLoading && !authUser) {
       router.push('/login');
     }
-  };
+  }, [authLoading, authUser, router]);
+
+  // Sync local user state with auth context
+  useEffect(() => {
+    if (authUser) {
+      setLocalUser(authUser);
+      setEditName(authUser.name || '');
+    }
+  }, [authUser]);
 
   const handleUpdateProfile = async () => {
     if (!editName.trim()) {
@@ -58,7 +57,8 @@ export default function AccountPage() {
     setSaving(true);
     try {
       const res = await authApi.updateProfile({ name: editName.trim() });
-      setUser(res.data);
+      setLocalUser(res.data);
+      refreshUser();
       setIsEditDialogOpen(false);
     } catch (error: any) {
       console.error('Failed to update profile:', error);
@@ -92,7 +92,8 @@ export default function AccountPage() {
     setUploadingAvatar(true);
     try {
       const res = await authApi.uploadAvatar(file);
-      setUser(res.data);
+      setLocalUser(res.data);
+      refreshUser();
     } catch (error: any) {
       console.error('Failed to upload avatar:', error);
       alert(error.response?.data?.detail || '画像のアップロードに失敗しました');
@@ -111,7 +112,8 @@ export default function AccountPage() {
     setUploadingAvatar(true);
     try {
       const res = await authApi.deleteAvatar();
-      setUser(res.data);
+      setLocalUser(res.data);
+      refreshUser();
     } catch (error: any) {
       console.error('Failed to delete avatar:', error);
       alert(error.response?.data?.detail || '画像の削除に失敗しました');
@@ -129,25 +131,29 @@ export default function AccountPage() {
   };
 
   const getAvatarUrl = () => {
-    if (!user?.picture_url) return null;
+    if (!localUser?.picture_url) return null;
     // If it's a local upload, prepend API URL
-    if (user.picture_url.startsWith('/uploads/')) {
-      return `${API_URL}${user.picture_url}`;
+    if (localUser.picture_url.startsWith('/uploads/')) {
+      return `${API_URL}${localUser.picture_url}`;
     }
     // External URL (e.g., Google)
-    return user.picture_url;
+    return localUser.picture_url;
   };
 
-  if (loading) {
+  // Show loading while auth is loading
+  if (authLoading || !authUser) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center items-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
       </div>
     );
   }
 
+  // Use localUser for display (which is synced with authUser)
+  const user = localUser || authUser;
+
   return (
-    <MainLayout user={user!}>
+    <MainLayout user={user}>
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Header */}
         <div>
@@ -269,7 +275,7 @@ export default function AccountPage() {
                       variant="outline"
                       onClick={() => {
                         setIsEditDialogOpen(false);
-                        setEditName(user?.name || '');
+                        setEditName(localUser?.name || '');
                       }}
                       className="flex-1"
                     >
