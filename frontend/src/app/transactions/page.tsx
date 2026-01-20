@@ -231,22 +231,22 @@ export default function TransactionsPage() {
                     新規登録
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle className="text-2xl">取引登録</DialogTitle>
                     <p className="text-sm text-gray-600 dark:text-gray-400">収入または支出を記録します</p>
                   </DialogHeader>
 
-                  <div className="mt-6 space-y-6">
+                  <div className="mt-4 space-y-4">
                     {/* Transaction Info */}
                     <div>
-                      <h3 className="text-lg font-semibold mb-3 dark:text-white">取引情報</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                      <h3 className="text-lg font-semibold mb-2 dark:text-white">取引情報</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                         必要な情報を入力してください
                       </p>
 
                       {/* Type */}
-                      <div className="mb-4">
+                      <div className="mb-3">
                         <Label className="mb-2 block">
                           種類 <span className="text-red-500">*</span>
                         </Label>
@@ -284,7 +284,7 @@ export default function TransactionsPage() {
                       </div>
 
                       {/* Category */}
-                      <div className="mb-4">
+                      <div className="mb-3">
                         <Label htmlFor="category" className="mb-2 block">
                           カテゴリー <span className="text-red-500">*</span>
                         </Label>
@@ -303,7 +303,7 @@ export default function TransactionsPage() {
                       </div>
 
                       {/* Amount */}
-                      <div className="mb-4">
+                      <div className="mb-3">
                         <Label htmlFor="amount" className="mb-2 block">
                           金額 <span className="text-red-500">*</span>
                         </Label>
@@ -317,7 +317,7 @@ export default function TransactionsPage() {
                       </div>
 
                       {/* Date */}
-                      <div className="mb-4">
+                      <div className="mb-3">
                         <Label htmlFor="date" className="mb-2 block">
                           日付 <span className="text-red-500">*</span>
                         </Label>
@@ -330,7 +330,7 @@ export default function TransactionsPage() {
                       </div>
 
                       {/* Description */}
-                      <div className="mb-4">
+                      <div className="mb-3">
                         <Label htmlFor="description" className="mb-2 block">
                           説明（任意）
                         </Label>
@@ -363,7 +363,7 @@ export default function TransactionsPage() {
                     </div>
 
                     {/* Buttons */}
-                    <div className="flex gap-3 pt-4 border-t dark:border-gray-700">
+                    <div className="flex gap-3 pt-3 border-t dark:border-gray-700">
                       <Button
                         type="button"
                         variant="outline"

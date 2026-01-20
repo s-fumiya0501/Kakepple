@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 import MainLayout from "@/components/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -166,6 +167,7 @@ export default function DashboardPage() {
   const [quickInputCategory, setQuickInputCategory] = useState('');
   const [quickInputAmount, setQuickInputAmount] = useState('');
   const [quickInputDescription, setQuickInputDescription] = useState('');
+  const [quickInputIsSplit, setQuickInputIsSplit] = useState(false);
   const [quickInputLoading, setQuickInputLoading] = useState(false);
 
   // Custom category states
@@ -334,6 +336,7 @@ export default function DashboardPage() {
     setQuickInputCategory(category);
     setQuickInputAmount('');
     setQuickInputDescription('');
+    setQuickInputIsSplit(false);
     setQuickInputOpen(true);
   }, []);
 
@@ -349,12 +352,13 @@ export default function DashboardPage() {
         amount: parseFloat(quickInputAmount),
         date: today,
         description: quickInputDescription || '',
-        is_split: false,
+        is_split: quickInputIsSplit && couple !== null,
       });
 
       setQuickInputOpen(false);
       setQuickInputAmount('');
       setQuickInputDescription('');
+      setQuickInputIsSplit(false);
 
       // Refresh summary and transactions
       const [summaryRes, transactionsRes] = await Promise.allSettled([
@@ -369,7 +373,7 @@ export default function DashboardPage() {
     } finally {
       setQuickInputLoading(false);
     }
-  }, [quickInputAmount, quickInputCategory, quickInputDescription]);
+  }, [quickInputAmount, quickInputCategory, quickInputDescription, quickInputIsSplit, couple]);
 
   // Budget info calculations
   const personalBudgetInfo = useMemo(() => {
@@ -494,6 +498,7 @@ export default function DashboardPage() {
                   colorClass="text-green-600 dark:text-green-400"
                   bgClass="bg-green-100 dark:bg-green-900"
                   formatCurrency={formatCurrency}
+                  href="/transactions?type=income"
                 />
                 <SummaryCard
                   label="支出"
@@ -502,6 +507,7 @@ export default function DashboardPage() {
                   colorClass="text-red-600 dark:text-red-400"
                   bgClass="bg-red-100 dark:bg-red-900"
                   formatCurrency={formatCurrency}
+                  href="/transactions?type=expense"
                 />
                 <SummaryCard
                   label="残高"
@@ -510,6 +516,7 @@ export default function DashboardPage() {
                   colorClass={personalStats.balance >= 0 ? "text-blue-600 dark:text-blue-400" : "text-orange-600 dark:text-orange-400"}
                   bgClass="bg-blue-100 dark:bg-blue-900"
                   formatCurrency={formatCurrency}
+                  href="/analytics"
                 />
               </div>
             )}
@@ -589,6 +596,7 @@ export default function DashboardPage() {
                       colorClass="text-green-600 dark:text-green-400"
                       bgClass="bg-green-100 dark:bg-green-900"
                       formatCurrency={formatCurrency}
+                      href="/transactions?scope=couple&type=income"
                     />
                     <SummaryCard
                       label="支出"
@@ -597,6 +605,7 @@ export default function DashboardPage() {
                       colorClass="text-red-600 dark:text-red-400"
                       bgClass="bg-red-100 dark:bg-red-900"
                       formatCurrency={formatCurrency}
+                      href="/transactions?scope=couple&type=expense"
                     />
                     <SummaryCard
                       label="残高"
@@ -605,6 +614,7 @@ export default function DashboardPage() {
                       colorClass={coupleStats.balance >= 0 ? "text-blue-600 dark:text-blue-400" : "text-orange-600 dark:text-orange-400"}
                       bgClass="bg-blue-100 dark:bg-blue-900"
                       formatCurrency={formatCurrency}
+                      href="/analytics"
                     />
                   </div>
                 )}
@@ -915,12 +925,27 @@ export default function DashboardPage() {
                 value={quickInputDescription}
                 onChange={(e) => setQuickInputDescription(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === 'Enter' && !quickInputIsSplit) {
                     handleQuickSubmit();
                   }
                 }}
               />
             </div>
+            {/* Split toggle - only show if in a couple */}
+            {couple && (
+              <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white text-sm">割り勘にする</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    {couple.user1.id === user?.id ? couple.user2.name : couple.user1.name} さんと半額ずつ
+                  </p>
+                </div>
+                <Switch
+                  checked={quickInputIsSplit}
+                  onCheckedChange={setQuickInputIsSplit}
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button

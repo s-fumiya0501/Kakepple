@@ -1,6 +1,7 @@
 'use client';
 
 import { memo } from 'react';
+import Link from 'next/link';
 import { Target } from 'lucide-react';
 
 interface BudgetInfo {
@@ -16,11 +17,12 @@ interface BudgetCardProps {
   budgetInfo: BudgetInfo;
   gradient: string;
   formatCurrency: (value: number) => string;
+  href?: string;
 }
 
-function BudgetCardComponent({ budgetInfo, gradient, formatCurrency }: BudgetCardProps) {
-  return (
-    <div className={`rounded-lg ${gradient} p-4 text-white`}>
+function BudgetCardComponent({ budgetInfo, gradient, formatCurrency, href = '/budgets' }: BudgetCardProps) {
+  const content = (
+    <>
       <div className="flex items-center gap-2 mb-2">
         <Target className="h-4 w-4" />
         <h4 className="font-semibold text-sm">月次支出目標</h4>
@@ -47,7 +49,13 @@ function BudgetCardComponent({ budgetInfo, gradient, formatCurrency }: BudgetCar
           {formatCurrency(budgetInfo.used)} / {formatCurrency(budgetInfo.total)}
         </p>
       </div>
-    </div>
+    </>
+  );
+
+  return (
+    <Link href={href} className={`block rounded-lg ${gradient} p-4 text-white hover:opacity-90 transition-opacity cursor-pointer`}>
+      {content}
+    </Link>
   );
 }
 
