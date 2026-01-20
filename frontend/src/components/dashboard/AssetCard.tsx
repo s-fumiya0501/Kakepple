@@ -1,6 +1,7 @@
 'use client';
 
 import { memo } from 'react';
+import Link from 'next/link';
 
 interface AssetCardProps {
   label: string;
@@ -10,6 +11,7 @@ interface AssetCardProps {
   icon: React.ComponentType<{ className?: string }>;
   gradient: string;
   formatCurrency: (value: string | number) => string;
+  href?: string;
 }
 
 function AssetCardComponent({
@@ -19,17 +21,24 @@ function AssetCardComponent({
   subValue,
   icon: Icon,
   gradient,
-  formatCurrency
+  formatCurrency,
+  href = '/assets'
 }: AssetCardProps) {
-  return (
-    <div className={`rounded-lg ${gradient} p-4 text-white`}>
+  const content = (
+    <>
       <div className="flex items-center gap-2 mb-2">
         <Icon className="h-4 w-4" />
         <h4 className="font-semibold text-sm">{label}</h4>
       </div>
       <p className="text-xl font-bold">{formatCurrency(value)}</p>
       <p className="text-xs opacity-75 mt-1">{subLabel} ({subValue})</p>
-    </div>
+    </>
+  );
+
+  return (
+    <Link href={href} className={`block rounded-lg ${gradient} p-4 text-white hover:opacity-90 transition-opacity cursor-pointer`}>
+      {content}
+    </Link>
   );
 }
 
