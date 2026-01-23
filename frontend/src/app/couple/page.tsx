@@ -14,9 +14,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { coupleApi } from "@/lib/api";
+import { coupleApi, transactionApi } from "@/lib/api";
+import { Transaction } from "@/types";
 import { InviteCode } from "@/types";
-import { Heart, Copy, UserPlus, LogOut, Check, Sparkles, PiggyBank, BarChart3, Users } from "lucide-react";
+import { Heart, Copy, UserPlus, LogOut, Check, Sparkles, PiggyBank, BarChart3, Users, Calculator, ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { PageSkeleton } from "@/components/DashboardSkeleton";
 import { PageLoadingSpinner } from "@/components/ui/loading-spinner";
@@ -33,12 +34,82 @@ export default function CouplePage() {
   // Form state
   const [inviteCodeInput, setInviteCodeInput] = useState('');
 
+  // Settlement calculation state
+  const [splitTransactions, setSplitTransactions] = useState<Transaction[]>([]);
+  const [settlementLoading, setSettlementLoading] = useState(false);
+  const [settlementInfo, setSettlementInfo] = useState<{
+    myTotal: number;
+    partnerTotal: number;
+    difference: number;
+    iPayPartner: boolean;
+  } | null>(null);
+
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
     }
   }, [authLoading, user, router]);
+
+  // Fetch split transactions for settlement calculation
+  useEffect(() => {
+    if (couple && user) {
+      fetchSettlement();
+    }
+  }, [couple, user]);
+
+  const fetchSettlement = async () => {
+    if (!couple || !user) return;
+
+    setSettlementLoading(true);
+    try {
+      // Get current month's split transactions
+      const now = new Date();
+      const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+      const res = await transactionApi.list({
+        scope: 'couple',
+        start_date: startDate,
+        end_date: endDate,
+      });
+
+      // Filter only split transactions (expenses)
+      const splits = res.data.filter((t: Transaction) => t.is_split && t.type === 'expense');
+      setSplitTransactions(splits);
+
+      // Calculate settlement
+      let myTotal = 0;
+      let partnerTotal = 0;
+
+      splits.forEach((t: Transaction) => {
+        const amount = parseFloat(String(t.amount));
+        if (t.user_id === user.id) {
+          myTotal += amount;
+        } else {
+          partnerTotal += amount;
+        }
+      });
+
+      // Each person should pay half of the total
+      const totalSplitExpense = myTotal + partnerTotal;
+      const halfShare = totalSplitExpense / 2;
+
+      // What I've paid vs what I should pay
+      const myDifference = myTotal - halfShare;
+
+      setSettlementInfo({
+        myTotal,
+        partnerTotal,
+        difference: Math.abs(myDifference),
+        iPayPartner: myDifference < 0, // If I've paid less than my share, I owe partner
+      });
+    } catch (error) {
+      console.error('Failed to fetch settlement:', error);
+    } finally {
+      setSettlementLoading(false);
+    }
+  };
 
   const handleGenerateInviteCode = async () => {
     setGenerating(true);
@@ -171,6 +242,98 @@ export default function CouplePage() {
                   {formatDate(couple.created_at)} から一緒に管理中
                 </p>
               </div>
+            </div>
+
+            {/* Settlement Card */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Calculator className="h-5 w-5 text-blue-500" />
+                <h2 className="font-semibold text-gray-900 dark:text-white">今月の精算</h2>
+              </div>
+
+              {settlementLoading ? (
+                <div className="py-4 text-center text-gray-500">計算中...</div>
+              ) : settlementInfo ? (
+                <div className="space-y-4">
+                  {/* My payments */}
+                  <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <span className="text-sm text-gray-600 dark:text-gray-300">あなたが支払った割り勘</span>
+                    <span className="font-semibold text-gray-900 dark:text-white">
+                      ¥{settlementInfo.myTotal.toLocaleString()}
+                    </span>
+                  </div>
+
+                  {/* Partner payments */}
+                  <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <span className="text-sm text-gray-600 dark:text-gray-300">{partnerInfo?.name}さんが支払った割り勘</span>
+                    <span className="font-semibold text-gray-900 dark:text-white">
+                      ¥{settlementInfo.partnerTotal.toLocaleString()}
+                    </span>
+                  </div>
+
+                  {/* Settlement result */}
+                  {settlementInfo.difference > 0 ? (
+                    <div className={`p-4 rounded-lg ${
+                      settlementInfo.iPayPartner
+                        ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+                        : 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                    }`}>
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                        <span className={`font-medium ${
+                          settlementInfo.iPayPartner
+                            ? 'text-red-700 dark:text-red-300'
+                            : 'text-green-700 dark:text-green-300'
+                        }`}>
+                          {settlementInfo.iPayPartner ? 'あなた' : partnerInfo?.name}
+                        </span>
+                        <ArrowRight className={`h-4 w-4 ${
+                          settlementInfo.iPayPartner
+                            ? 'text-red-500'
+                            : 'text-green-500'
+                        }`} />
+                        <span className={`font-medium ${
+                          settlementInfo.iPayPartner
+                            ? 'text-red-700 dark:text-red-300'
+                            : 'text-green-700 dark:text-green-300'
+                        }`}>
+                          {settlementInfo.iPayPartner ? partnerInfo?.name : 'あなた'}
+                        </span>
+                      </div>
+                      <p className={`text-center text-2xl font-bold ${
+                        settlementInfo.iPayPartner
+                          ? 'text-red-600 dark:text-red-400'
+                          : 'text-green-600 dark:text-green-400'
+                      }`}>
+                        ¥{settlementInfo.difference.toLocaleString()}
+                      </p>
+                      <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {settlementInfo.iPayPartner
+                          ? `あなたが${partnerInfo?.name}さんに支払う金額`
+                          : `${partnerInfo?.name}さんがあなたに支払う金額`
+                        }
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700 text-center">
+                      <Check className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                      <p className="text-gray-700 dark:text-gray-300 font-medium">
+                        精算不要です
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        今月は両者同額を支払っています
+                      </p>
+                    </div>
+                  )}
+
+                  <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                    ※ 割り勘として登録された今月の支出のみが対象です
+                  </p>
+                </div>
+              ) : (
+                <div className="py-4 text-center text-gray-500 dark:text-gray-400">
+                  今月の割り勘取引はありません
+                </div>
+              )}
             </div>
 
             {/* Features Card */}
