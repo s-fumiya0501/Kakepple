@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { transactionApi } from "@/lib/api";
 import { Transaction, INCOME_CATEGORIES, ALL_EXPENSE_CATEGORIES } from "@/types";
-import { Trash2, Plus, Filter } from "lucide-react";
+import { Trash2, Plus, Filter, Pencil } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { PageSkeleton } from "@/components/DashboardSkeleton";
 import { PageLoadingSpinner } from "@/components/ui/loading-spinner";
@@ -29,13 +29,15 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   // Filter state
   const [scopeFilter, setScopeFilter] = useState<'all' | 'personal' | 'couple'>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
-  // Form state
+  // Form state (for new transaction)
   const [formType, setFormType] = useState<'income' | 'expense'>('expense');
   const [formCategory, setFormCategory] = useState('');
   const [formAmount, setFormAmount] = useState('');
@@ -43,6 +45,15 @@ export default function TransactionsPage() {
   const [formDescription, setFormDescription] = useState('');
   const [formIsSplit, setFormIsSplit] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
+
+  // Edit form state
+  const [editFormType, setEditFormType] = useState<'income' | 'expense'>('expense');
+  const [editFormCategory, setEditFormCategory] = useState('');
+  const [editFormAmount, setEditFormAmount] = useState('');
+  const [editFormDate, setEditFormDate] = useState('');
+  const [editFormDescription, setEditFormDescription] = useState('');
+  const [editFormIsSplit, setEditFormIsSplit] = useState(false);
+  const [editFormLoading, setEditFormLoading] = useState(false);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -98,7 +109,7 @@ export default function TransactionsPage() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (continueAdding: boolean = false) => {
     if (!formCategory || !formAmount) {
       alert('カテゴリーと金額は必須です');
       return;
@@ -115,8 +126,14 @@ export default function TransactionsPage() {
         is_split: formType === 'expense' ? formIsSplit : false,
       });
 
-      setIsDialogOpen(false);
-      resetForm();
+      if (continueAdding) {
+        // 続けて登録: カテゴリと日付は保持、金額と説明をクリア
+        setFormAmount('');
+        setFormDescription('');
+      } else {
+        setIsDialogOpen(false);
+        resetForm();
+      }
       fetchTransactions();
     } catch (error) {
       console.error('Failed to create transaction:', error);
@@ -134,6 +151,47 @@ export default function TransactionsPage() {
     setFormDescription('');
     setFormIsSplit(false);
   };
+
+  const openEditDialog = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setEditFormType(transaction.type);
+    setEditFormCategory(transaction.category);
+    setEditFormAmount(String(transaction.amount));
+    setEditFormDate(transaction.date);
+    setEditFormDescription(transaction.description || '');
+    setEditFormIsSplit(transaction.is_split);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editingTransaction || !editFormCategory || !editFormAmount) {
+      alert('カテゴリーと金額は必須です');
+      return;
+    }
+
+    setEditFormLoading(true);
+    try {
+      await transactionApi.update(editingTransaction.id, {
+        type: editFormType,
+        category: editFormCategory,
+        amount: parseFloat(editFormAmount),
+        date: editFormDate,
+        description: editFormDescription,
+        is_split: editFormType === 'expense' ? editFormIsSplit : false,
+      });
+
+      setIsEditDialogOpen(false);
+      setEditingTransaction(null);
+      fetchTransactions();
+    } catch (error) {
+      console.error('Failed to update transaction:', error);
+      alert('更新に失敗しました');
+    } finally {
+      setEditFormLoading(false);
+    }
+  };
+
+  const editAvailableCategories = editFormType === 'income' ? INCOME_CATEGORIES : ALL_EXPENSE_CATEGORIES;
 
   const formatCurrency = (amount: string | number) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -374,7 +432,16 @@ export default function TransactionsPage() {
                       </Button>
                       <Button
                         type="button"
-                        onClick={handleSubmit}
+                        variant="outline"
+                        onClick={() => handleSubmit(true)}
+                        disabled={formLoading}
+                        className="flex-1"
+                      >
+                        {formLoading ? '登録中...' : '続けて登録'}
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => handleSubmit(false)}
                         disabled={formLoading}
                         className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
                       >
@@ -430,7 +497,11 @@ export default function TransactionsPage() {
                     const formattedDate = `${date.getMonth() + 1}/${date.getDate()}`;
                     const fullDate = transaction.date;
                     return (
-                      <tr key={transaction.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <tr
+                        key={transaction.id}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                        onClick={() => openEditDialog(transaction)}
+                      >
                         <td className="px-3 md:px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                           <span className="md:hidden">{formattedDate}</span>
                           <span className="hidden md:inline">{fullDate}</span>
@@ -470,12 +541,26 @@ export default function TransactionsPage() {
                           </span>
                         </td>
                         <td className="px-2 md:px-6 py-4 whitespace-nowrap text-center">
-                          <button
-                            onClick={() => handleDelete(transaction.id)}
-                            className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditDialog(transaction);
+                              }}
+                              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(transaction.id);
+                              }}
+                              className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -485,6 +570,159 @@ export default function TransactionsPage() {
             </table>
           </div>
         </div>
+
+        {/* Edit Transaction Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl">取引を編集</DialogTitle>
+              <p className="text-sm text-gray-600 dark:text-gray-400">取引内容を変更します</p>
+            </DialogHeader>
+
+            <div className="mt-4 space-y-4">
+              {/* Transaction Info */}
+              <div>
+                <h3 className="text-lg font-semibold mb-2 dark:text-white">取引情報</h3>
+
+                {/* Type */}
+                <div className="mb-3">
+                  <Label className="mb-2 block">
+                    種類 <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditFormType('income');
+                        setEditFormCategory('');
+                        setEditFormIsSplit(false);
+                      }}
+                      className={`px-4 py-3 rounded-lg border-2 transition-all ${
+                        editFormType === 'income'
+                          ? 'border-green-500 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                          : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-300'
+                      }`}
+                    >
+                      収入
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditFormType('expense');
+                        setEditFormCategory('');
+                      }}
+                      className={`px-4 py-3 rounded-lg border-2 transition-all ${
+                        editFormType === 'expense'
+                          ? 'border-red-500 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                          : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-300'
+                      }`}
+                    >
+                      支出
+                    </button>
+                  </div>
+                </div>
+
+                {/* Category */}
+                <div className="mb-3">
+                  <Label htmlFor="edit-category" className="mb-2 block">
+                    カテゴリー <span className="text-red-500">*</span>
+                  </Label>
+                  <Select value={editFormCategory} onValueChange={setEditFormCategory}>
+                    <SelectTrigger id="edit-category">
+                      <SelectValue placeholder="カテゴリーを選択" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {editAvailableCategories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Amount */}
+                <div className="mb-3">
+                  <Label htmlFor="edit-amount" className="mb-2 block">
+                    金額 <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="edit-amount"
+                    type="number"
+                    placeholder="10000"
+                    value={editFormAmount}
+                    onChange={(e) => setEditFormAmount(e.target.value)}
+                  />
+                </div>
+
+                {/* Date */}
+                <div className="mb-3">
+                  <Label htmlFor="edit-date" className="mb-2 block">
+                    日付 <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="edit-date"
+                    type="date"
+                    value={editFormDate}
+                    onChange={(e) => setEditFormDate(e.target.value)}
+                  />
+                </div>
+
+                {/* Description */}
+                <div className="mb-3">
+                  <Label htmlFor="edit-description" className="mb-2 block">
+                    説明（任意）
+                  </Label>
+                  <Textarea
+                    id="edit-description"
+                    placeholder="例: スーパーでの買い物"
+                    value={editFormDescription}
+                    onChange={(e) => setEditFormDescription(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+
+                {/* Split Setting - only for expenses */}
+                {couple && editFormType === 'expense' && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">割り勘にする</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {couple.user1.id === user?.id ? couple.user2.name : couple.user1.name} さんと半額ずつ負担します
+                        </p>
+                      </div>
+                      <Switch
+                        checked={editFormIsSplit}
+                        onCheckedChange={setEditFormIsSplit}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3 pt-3 border-t dark:border-gray-700">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditDialogOpen(false)}
+                  className="flex-1"
+                >
+                  キャンセル
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleEditSubmit}
+                  disabled={editFormLoading}
+                  className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
+                >
+                  {editFormLoading ? '更新中...' : '更新する'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );
