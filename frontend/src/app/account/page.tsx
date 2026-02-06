@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { toast } from '@/hooks/use-toast';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useRouter } from 'next/navigation';
 import MainLayout from '@/components/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -30,6 +32,7 @@ export default function AccountPage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [deleteAvatarConfirmOpen, setDeleteAvatarConfirmOpen] = useState(false);
 
   // Form state
   const [editName, setEditName] = useState('');
@@ -51,7 +54,7 @@ export default function AccountPage() {
 
   const handleUpdateProfile = async () => {
     if (!editName.trim()) {
-      alert('名前を入力してください');
+      toast({ title: '入力エラー', description: '名前を入力してください', variant: 'destructive' });
       return;
     }
 
@@ -63,7 +66,7 @@ export default function AccountPage() {
       setIsEditDialogOpen(false);
     } catch (error: any) {
       console.error('Failed to update profile:', error);
-      alert(error.response?.data?.detail || 'プロフィールの更新に失敗しました');
+      toast({ title: 'エラー', description: error.response?.data?.detail || 'プロフィールの更新に失敗しました', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -80,13 +83,13 @@ export default function AccountPage() {
     // Validate file type
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      alert('画像ファイル（JPEG, PNG, GIF, WebP）のみアップロード可能です');
+      toast({ title: '入力エラー', description: '画像ファイル（JPEG, PNG, GIF, WebP）のみアップロード可能です', variant: 'destructive' });
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('ファイルサイズは5MB以下にしてください');
+      toast({ title: '入力エラー', description: 'ファイルサイズは5MB以下にしてください', variant: 'destructive' });
       return;
     }
 
@@ -97,7 +100,7 @@ export default function AccountPage() {
       refreshUser();
     } catch (error: any) {
       console.error('Failed to upload avatar:', error);
-      alert(error.response?.data?.detail || '画像のアップロードに失敗しました');
+      toast({ title: 'エラー', description: error.response?.data?.detail || '画像のアップロードに失敗しました', variant: 'destructive' });
     } finally {
       setUploadingAvatar(false);
       // Reset input
@@ -108,8 +111,10 @@ export default function AccountPage() {
   };
 
   const handleDeleteAvatar = async () => {
-    if (!confirm('プロフィール画像を削除しますか？')) return;
+    setDeleteAvatarConfirmOpen(true);
+  };
 
+  const confirmDeleteAvatar = async () => {
     setUploadingAvatar(true);
     try {
       const res = await authApi.deleteAvatar();
@@ -117,9 +122,10 @@ export default function AccountPage() {
       refreshUser();
     } catch (error: any) {
       console.error('Failed to delete avatar:', error);
-      alert(error.response?.data?.detail || '画像の削除に失敗しました');
+      toast({ title: 'エラー', description: error.response?.data?.detail || '画像の削除に失敗しました', variant: 'destructive' });
     } finally {
       setUploadingAvatar(false);
+      setDeleteAvatarConfirmOpen(false);
     }
   };
 
@@ -329,6 +335,14 @@ export default function AccountPage() {
           </p>
         </div>
       </div>
+      <ConfirmDialog
+        open={deleteAvatarConfirmOpen}
+        onOpenChange={setDeleteAvatarConfirmOpen}
+        title="プロフィール画像を削除しますか？"
+        confirmLabel="削除"
+        variant="danger"
+        onConfirm={confirmDeleteAvatar}
+      />
     </MainLayout>
   );
 }

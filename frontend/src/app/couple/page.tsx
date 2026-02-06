@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import { toast } from '@/hooks/use-toast';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useRouter } from "next/navigation";
 import MainLayout from "@/components/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,7 @@ export default function CouplePage() {
   const [joining, setJoining] = useState(false);
   const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
 
   // Form state
   const [inviteCodeInput, setInviteCodeInput] = useState('');
@@ -119,7 +122,7 @@ export default function CouplePage() {
       setInviteCode(res.data);
     } catch (error: any) {
       console.error('Failed to generate invite code:', error);
-      alert(error.response?.data?.detail || '招待コードの生成に失敗しました');
+      toast({ title: 'エラー', description: error.response?.data?.detail || '招待コードの生成に失敗しました', variant: 'destructive' });
     } finally {
       setGenerating(false);
     }
@@ -127,7 +130,7 @@ export default function CouplePage() {
 
   const handleJoinCouple = async () => {
     if (!inviteCodeInput.trim()) {
-      alert('招待コードを入力してください');
+      toast({ title: '入力エラー', description: '招待コードを入力してください', variant: 'destructive' });
       return;
     }
 
@@ -139,24 +142,26 @@ export default function CouplePage() {
       if (refreshCouple) refreshCouple();
     } catch (error: any) {
       console.error('Failed to join couple:', error);
-      alert(error.response?.data?.detail || 'カップル登録に失敗しました');
+      toast({ title: 'エラー', description: error.response?.data?.detail || 'カップル登録に失敗しました', variant: 'destructive' });
     } finally {
       setJoining(false);
     }
   };
 
   const handleLeaveCouple = async () => {
-    if (!confirm('カップル登録を解除しますか？これにより、共有していた家計簿データへのアクセスができなくなります。')) {
-      return;
-    }
+    setLeaveConfirmOpen(true);
+  };
 
+  const confirmLeaveCouple = async () => {
     try {
       await coupleApi.leaveCouple();
       if (refreshCouple) refreshCouple();
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Failed to leave couple:', error);
-      alert(error.response?.data?.detail || 'カップル登録の解除に失敗しました');
+      toast({ title: 'エラー', description: error.response?.data?.detail || 'カップル登録の解除に失敗しました', variant: 'destructive' });
+    } finally {
+      setLeaveConfirmOpen(false);
     }
   };
 
@@ -526,6 +531,15 @@ export default function CouplePage() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={leaveConfirmOpen}
+        onOpenChange={setLeaveConfirmOpen}
+        title="カップル登録を解除しますか？"
+        description="共有していた家計簿データへのアクセスができなくなります。"
+        confirmLabel="解除"
+        variant="danger"
+        onConfirm={confirmLeaveCouple}
+      />
     </MainLayout>
   );
 }

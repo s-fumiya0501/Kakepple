@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { toast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import MainLayout from '@/components/MainLayout';
@@ -70,7 +71,7 @@ export default function AdminUsersPage() {
       fetchUsers();
       setEditingUser(null);
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'ユーザーの更新に失敗しました');
+      toast({ title: 'エラー', description: error.response?.data?.detail || 'ユーザーの更新に失敗しました', variant: 'destructive' });
     }
   };
 
@@ -80,7 +81,7 @@ export default function AdminUsersPage() {
       setShowDeleteConfirm(null);
       fetchUsers();
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'ユーザーの削除に失敗しました');
+      toast({ title: 'エラー', description: error.response?.data?.detail || 'ユーザーの削除に失敗しました', variant: 'destructive' });
     }
   };
 

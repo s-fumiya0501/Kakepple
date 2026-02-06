@@ -27,6 +27,7 @@ import {
 const API_URL = 'https://kakepple-production.up.railway.app';
 import { User } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { QuickInputFAB } from '@/components/QuickInputFAB';
 
 interface MainLayoutProps {
   user: User;
@@ -269,8 +270,11 @@ export default function MainLayout({ user, children }: MainLayoutProps) {
         </main>
       </div>
 
+      {/* フローティング支出登録ボタン */}
+      <QuickInputFAB />
+
       {/* モバイル下部ナビゲーション */}
-      <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-gray-200 bg-white md:hidden dark:border-gray-700 dark:bg-gray-800">
+      <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-gray-200 bg-white md:hidden dark:border-gray-700 dark:bg-gray-800 pb-[env(safe-area-inset-bottom)]">
         <div className="grid grid-cols-5">
           {navigation.slice(0, 5).map((item) => {
             const Icon = item.icon;
@@ -278,14 +282,14 @@ export default function MainLayout({ user, children }: MainLayoutProps) {
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex flex-col items-center justify-center py-2 ${
+                className={`flex flex-col items-center justify-center py-2.5 min-h-[56px] ${
                   isActive(item.href)
                     ? 'text-pink-600 dark:text-pink-400'
                     : 'text-gray-500 dark:text-gray-400'
                 }`}
               >
-                <Icon className="h-5 w-5" />
-                <span className="mt-1 text-[10px] truncate">{item.name}</span>
+                <Icon className="h-6 w-6" />
+                <span className="mt-0.5 text-xs truncate">{item.name}</span>
               </Link>
             );
           })}

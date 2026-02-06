@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from "react";
+import { toast } from '@/hooks/use-toast';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useRouter } from "next/navigation";
 import MainLayout from "@/components/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -36,6 +38,8 @@ export default function AssetsPage() {
   const [formAmount, setFormAmount] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formLoading, setFormLoading] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingAssetId, setDeletingAssetId] = useState<string | null>(null);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -94,7 +98,7 @@ export default function AssetsPage() {
 
   const handleSubmit = async () => {
     if (!formName || !formType || !formAmount) {
-      alert('名前、種類、金額は必須です');
+      toast({ title: '入力エラー', description: '名前、種類、金額は必須です', variant: 'destructive' });
       return;
     }
 
@@ -120,23 +124,28 @@ export default function AssetsPage() {
       fetchData();
     } catch (error) {
       console.error('Failed to save asset:', error);
-      alert('保存に失敗しました');
+      toast({ title: 'エラー', description: '保存に失敗しました', variant: 'destructive' });
     } finally {
       setFormLoading(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('この資産を削除しますか？')) {
-      return;
-    }
+    setDeletingAssetId(id);
+    setDeleteConfirmOpen(true);
+  };
 
+  const confirmDeleteAsset = async () => {
+    if (!deletingAssetId) return;
     try {
-      await assetApi.delete(id);
+      await assetApi.delete(deletingAssetId);
       fetchData();
     } catch (error) {
       console.error('Failed to delete asset:', error);
-      alert('削除に失敗しました');
+      toast({ title: 'エラー', description: '削除に失敗しました', variant: 'destructive' });
+    } finally {
+      setDeleteConfirmOpen(false);
+      setDeletingAssetId(null);
     }
   };
 
@@ -353,6 +362,14 @@ export default function AssetsPage() {
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="この資産を削除しますか？"
+        confirmLabel="削除"
+        variant="danger"
+        onConfirm={confirmDeleteAsset}
+      />
     </MainLayout>
   );
 }

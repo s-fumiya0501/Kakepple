@@ -23,15 +23,30 @@ function SummaryCardComponent({
   href
 }: SummaryCardProps) {
   const content = (
-    <div className="flex flex-col items-center text-center">
-      <div className={`rounded-full p-2 ${bgClass} mb-2`}>
-        <Icon className={`h-4 w-4 ${colorClass}`} />
+    <>
+      {/* モバイル: 横レイアウト */}
+      <div className="flex items-center gap-3 sm:hidden">
+        <div className={`rounded-full p-2.5 ${bgClass} flex-shrink-0`}>
+          <Icon className={`h-5 w-5 ${colorClass}`} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-gray-600 dark:text-gray-400">{label}</p>
+          <p className={`text-lg font-bold ${colorClass} truncate`}>
+            {formatCurrency(value)}
+          </p>
+        </div>
       </div>
-      <p className="text-xs text-gray-600 dark:text-gray-400">{label}</p>
-      <p className={`mt-1 text-sm md:text-lg font-bold ${colorClass} break-all`}>
-        {formatCurrency(value)}
-      </p>
-    </div>
+      {/* デスクトップ: 縦レイアウト */}
+      <div className="hidden sm:flex flex-col items-center text-center">
+        <div className={`rounded-full p-2 ${bgClass} mb-2`}>
+          <Icon className={`h-4 w-4 ${colorClass}`} />
+        </div>
+        <p className="text-xs text-gray-600 dark:text-gray-400">{label}</p>
+        <p className={`mt-1 text-sm md:text-lg font-bold ${colorClass} break-all`}>
+          {formatCurrency(value)}
+        </p>
+      </div>
+    </>
   );
 
   if (href) {
