@@ -22,6 +22,7 @@ import { Trash2, Plus, Filter, Pencil, TrendingUp, TrendingDown } from "lucide-r
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { PaidBySelector } from "@/components/PaidBySelector";
 import { PageSkeleton } from "@/components/DashboardSkeleton";
 import { PageLoadingSpinner } from "@/components/ui/loading-spinner";
 
@@ -46,6 +47,7 @@ export default function TransactionsPage() {
   const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
   const [formDescription, setFormDescription] = useState('');
   const [formIsSplit, setFormIsSplit] = useState(false);
+  const [formPaidBy, setFormPaidBy] = useState('');
   const [formLoading, setFormLoading] = useState(false);
 
   // Delete confirmation state
@@ -59,6 +61,7 @@ export default function TransactionsPage() {
   const [editFormDate, setEditFormDate] = useState('');
   const [editFormDescription, setEditFormDescription] = useState('');
   const [editFormIsSplit, setEditFormIsSplit] = useState(false);
+  const [editFormPaidBy, setEditFormPaidBy] = useState('');
   const [editFormLoading, setEditFormLoading] = useState(false);
 
   // Redirect to login if not authenticated
@@ -140,13 +143,15 @@ export default function TransactionsPage() {
 
     setFormLoading(true);
     try {
+      const isSplit = formType === 'expense' && formIsSplit;
       await transactionApi.create({
         type: formType,
         category: formCategory,
         amount: parseFloat(formAmount),
         date: formDate,
         description: formDescription,
-        is_split: formType === 'expense' ? formIsSplit : false,
+        is_split: isSplit,
+        ...(isSplit && formPaidBy ? { paid_by_user_id: formPaidBy } : {}),
       });
 
       toast({
@@ -182,6 +187,7 @@ export default function TransactionsPage() {
     setFormDate(new Date().toISOString().split('T')[0]);
     setFormDescription('');
     setFormIsSplit(false);
+    setFormPaidBy(user?.id || '');
   };
 
   const openEditDialog = (transaction: Transaction) => {
@@ -192,6 +198,7 @@ export default function TransactionsPage() {
     setEditFormDate(transaction.date);
     setEditFormDescription(transaction.description || '');
     setEditFormIsSplit(transaction.is_split);
+    setEditFormPaidBy(transaction.paid_by_user_id || user?.id || '');
     setIsEditDialogOpen(true);
   };
 
@@ -207,13 +214,15 @@ export default function TransactionsPage() {
 
     setEditFormLoading(true);
     try {
+      const isSplit = editFormType === 'expense' && editFormIsSplit;
       await transactionApi.update(editingTransaction.id, {
         type: editFormType,
         category: editFormCategory,
         amount: parseFloat(editFormAmount),
         date: editFormDate,
         description: editFormDescription,
-        is_split: editFormType === 'expense' ? editFormIsSplit : false,
+        is_split: isSplit,
+        ...(isSplit && editFormPaidBy ? { paid_by_user_id: editFormPaidBy } : {}),
       });
 
       toast({
@@ -459,9 +468,20 @@ export default function TransactionsPage() {
                             </div>
                             <Switch
                               checked={formIsSplit}
-                              onCheckedChange={setFormIsSplit}
+                              onCheckedChange={(checked) => {
+                                setFormIsSplit(checked);
+                                if (checked) setFormPaidBy(user?.id || '');
+                              }}
                             />
                           </div>
+                          {formIsSplit && user && (
+                            <PaidBySelector
+                              couple={couple}
+                              userId={user.id}
+                              value={formPaidBy}
+                              onChange={setFormPaidBy}
+                            />
+                          )}
                         </div>
                       )}
                     </div>
@@ -751,9 +771,20 @@ export default function TransactionsPage() {
                       </div>
                       <Switch
                         checked={editFormIsSplit}
-                        onCheckedChange={setEditFormIsSplit}
+                        onCheckedChange={(checked) => {
+                          setEditFormIsSplit(checked);
+                          if (checked) setEditFormPaidBy(user?.id || '');
+                        }}
                       />
                     </div>
+                    {editFormIsSplit && user && (
+                      <PaidBySelector
+                        couple={couple}
+                        userId={user.id}
+                        value={editFormPaidBy}
+                        onChange={setEditFormPaidBy}
+                      />
+                    )}
                   </div>
                 )}
               </div>

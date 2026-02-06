@@ -29,7 +29,7 @@ class TransactionBase(BaseModel):
 
 class TransactionCreate(TransactionBase):
     """Transaction creation schema"""
-    pass
+    paid_by_user_id: Optional[uuid.UUID] = None
 
 
 class TransactionUpdate(BaseModel):
@@ -40,6 +40,7 @@ class TransactionUpdate(BaseModel):
     description: Optional[str] = None
     date: Optional[date] = None
     is_split: Optional[bool] = None
+    paid_by_user_id: Optional[uuid.UUID] = None
 
 
 class TransactionResponse(TransactionBase):
@@ -48,6 +49,7 @@ class TransactionResponse(TransactionBase):
     user_id: uuid.UUID
     couple_id: Optional[uuid.UUID] = None
     original_amount: Optional[Decimal] = None
+    paid_by_user_id: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: datetime
 

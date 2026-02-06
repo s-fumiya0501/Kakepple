@@ -20,12 +20,14 @@ class Transaction(Base):
     date = Column(Date, nullable=False)
     is_split = Column(Boolean, default=False)  # Flag for split expenses
     original_amount = Column(Numeric(12, 2), nullable=True)  # Original amount for split expenses
+    paid_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)  # Who actually paid (for split expenses)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
-    user = relationship("User", back_populates="transactions")
+    user = relationship("User", back_populates="transactions", foreign_keys=[user_id])
     couple = relationship("Couple", back_populates="transactions")
+    paid_by = relationship("User", foreign_keys=[paid_by_user_id])
 
     def __repr__(self):
         return f"<Transaction {self.type} {self.amount}>"

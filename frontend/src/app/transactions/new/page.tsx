@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { authApi, transactionApi, coupleApi } from "@/lib/api";
 import { User, Couple, INCOME_CATEGORIES, ALL_EXPENSE_CATEGORIES } from "@/types";
+import { PaidBySelector } from "@/components/PaidBySelector";
 
 export default function NewTransactionPage() {
   const router = useRouter();
@@ -28,6 +29,7 @@ export default function NewTransactionPage() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [description, setDescription] = useState('');
   const [isSplit, setIsSplit] = useState(false);
+  const [paidBy, setPaidBy] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -37,6 +39,7 @@ export default function NewTransactionPage() {
     try {
       const userRes = await authApi.me();
       setUser(userRes.data);
+      setPaidBy(userRes.data.id);
 
       try {
         const coupleRes = await coupleApi.getMyCouple();
@@ -63,13 +66,15 @@ export default function NewTransactionPage() {
     setSubmitting(true);
 
     try {
+      const splitEnabled = isSplit && couple !== null;
       await transactionApi.create({
         type,
         category,
         amount: parseFloat(amount),
         date,
         description: description || null,
-        is_split: isSplit && couple !== null,
+        is_split: splitEnabled,
+        ...(splitEnabled && paidBy ? { paid_by_user_id: paidBy } : {}),
       });
 
       toast({ title: '完了', description: '取引を登録しました', variant: 'success' });
@@ -200,25 +205,38 @@ export default function NewTransactionPage() {
 
               {/* Split Toggle */}
               {couple && type === 'expense' && (
-                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="space-y-1">
-                    <Label htmlFor="split" className="text-blue-900 font-semibold">
-                      割り勘にする
-                    </Label>
-                    <p className="text-sm text-blue-700">
-                      {couple.user1.id === user?.id ? couple.user2.name : couple.user1.name} さんと半額ずつ負担します
-                      {isSplit && amount && (
-                        <span className="block mt-1 font-medium">
-                          あなたの負担: ¥{(parseFloat(amount) / 2).toLocaleString()}
-                        </span>
-                      )}
-                    </p>
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label htmlFor="split" className="text-blue-900 font-semibold">
+                        割り勘にする
+                      </Label>
+                      <p className="text-sm text-blue-700">
+                        {couple.user1.id === user?.id ? couple.user2.name : couple.user1.name} さんと半額ずつ負担します
+                        {isSplit && amount && (
+                          <span className="block mt-1 font-medium">
+                            あなたの負担: ¥{(parseFloat(amount) / 2).toLocaleString()}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <Switch
+                      id="split"
+                      checked={isSplit}
+                      onCheckedChange={(checked) => {
+                        setIsSplit(checked);
+                        if (checked) setPaidBy(user?.id || '');
+                      }}
+                    />
                   </div>
-                  <Switch
-                    id="split"
-                    checked={isSplit}
-                    onCheckedChange={setIsSplit}
-                  />
+                  {isSplit && user && (
+                    <PaidBySelector
+                      couple={couple}
+                      userId={user.id}
+                      value={paidBy}
+                      onChange={setPaidBy}
+                    />
+                  )}
                 </div>
               )}
 

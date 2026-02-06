@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageLoadingSpinner, ChartLoadingSpinner } from "@/components/ui/loading-spinner";
 import { SummaryCard, BudgetCard, AssetCard } from "@/components/dashboard";
+import { PaidBySelector } from "@/components/PaidBySelector";
 import { toast } from "@/hooks/use-toast";
 import {
   TrendingUp,
@@ -172,6 +173,7 @@ export default function DashboardPage() {
   const [quickInputAmount, setQuickInputAmount] = useState('');
   const [quickInputDescription, setQuickInputDescription] = useState('');
   const [quickInputIsSplit, setQuickInputIsSplit] = useState(false);
+  const [quickInputPaidBy, setQuickInputPaidBy] = useState('');
   const [quickInputLoading, setQuickInputLoading] = useState(false);
 
   // Charts expanded state (collapsed by default on mobile)
@@ -357,8 +359,9 @@ export default function DashboardPage() {
     setQuickInputAmount('');
     setQuickInputDescription('');
     setQuickInputIsSplit(false);
+    setQuickInputPaidBy(user?.id || '');
     setQuickInputOpen(true);
-  }, []);
+  }, [user?.id]);
 
   const handleQuickSubmit = useCallback(async () => {
     if (!quickInputAmount || parseFloat(quickInputAmount) <= 0) return;
@@ -366,13 +369,15 @@ export default function DashboardPage() {
     setQuickInputLoading(true);
     try {
       const today = new Date().toISOString().split('T')[0];
+      const isSplit = quickInputIsSplit && couple !== null;
       await transactionApi.create({
         type: 'expense',
         category: quickInputCategory,
         amount: parseFloat(quickInputAmount),
         date: today,
         description: quickInputDescription || '',
-        is_split: quickInputIsSplit && couple !== null,
+        is_split: isSplit,
+        ...(isSplit && quickInputPaidBy ? { paid_by_user_id: quickInputPaidBy } : {}),
       });
 
       setQuickInputOpen(false);
@@ -404,7 +409,7 @@ export default function DashboardPage() {
     } finally {
       setQuickInputLoading(false);
     }
-  }, [quickInputAmount, quickInputCategory, quickInputDescription, quickInputIsSplit, couple]);
+  }, [quickInputAmount, quickInputCategory, quickInputDescription, quickInputIsSplit, quickInputPaidBy, couple]);
 
   // Budget info calculations
   const personalBudgetInfo = useMemo(() => {
@@ -928,17 +933,30 @@ export default function DashboardPage() {
             </div>
             {/* Split toggle - only show if in a couple */}
             {couple && (
-              <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <div>
-                  <p className="font-medium text-gray-900 dark:text-white text-sm">割り勘にする</p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
-                    {couple.user1.id === user?.id ? couple.user2.name : couple.user1.name} さんと半額ずつ
-                  </p>
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-white text-sm">割り勘にする</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      {couple.user1.id === user?.id ? couple.user2.name : couple.user1.name} さんと半額ずつ
+                    </p>
+                  </div>
+                  <Switch
+                    checked={quickInputIsSplit}
+                    onCheckedChange={(checked) => {
+                      setQuickInputIsSplit(checked);
+                      if (checked) setQuickInputPaidBy(user?.id || '');
+                    }}
+                  />
                 </div>
-                <Switch
-                  checked={quickInputIsSplit}
-                  onCheckedChange={setQuickInputIsSplit}
-                />
+                {quickInputIsSplit && user && (
+                  <PaidBySelector
+                    couple={couple}
+                    userId={user.id}
+                    value={quickInputPaidBy}
+                    onChange={setQuickInputPaidBy}
+                  />
+                )}
               </div>
             )}
           </div>
