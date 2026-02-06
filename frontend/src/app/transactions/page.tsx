@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { transactionApi } from "@/lib/api";
 import { Transaction, INCOME_CATEGORIES, ALL_EXPENSE_CATEGORIES } from "@/types";
-import { Trash2, Plus, Filter, Pencil, TrendingUp, TrendingDown } from "lucide-react";
+import { Trash2, Plus, Filter, Pencil, TrendingUp, TrendingDown, User as UserIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -557,7 +557,14 @@ export default function TransactionsPage() {
                             {transaction.category}
                           </span>
                           {transaction.is_split && (
-                            <span className="text-xs text-blue-600 dark:text-blue-400">割勘</span>
+                            <span className="inline-flex items-center gap-0.5 text-xs text-blue-600 dark:text-blue-400">
+                              <UserIcon className="h-3 w-3" />
+                              {transaction.paid_by_user_id && couple
+                                ? transaction.paid_by_user_id === user?.id
+                                  ? '自分払'
+                                  : (couple.user1.id === user?.id ? couple.user2.name : couple.user1.name) + '払'
+                                : '割勘'}
+                            </span>
                           )}
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
@@ -621,7 +628,18 @@ export default function TransactionsPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <span className="text-xs text-gray-500 dark:text-gray-400">{transaction.is_split ? 'カップル' : '個人'}</span>
+                          {transaction.is_split ? (
+                            <span className="inline-flex items-center gap-0.5 text-xs text-blue-600 dark:text-blue-400">
+                              <UserIcon className="h-3 w-3" />
+                              {transaction.paid_by_user_id && couple
+                                ? transaction.paid_by_user_id === user?.id
+                                  ? '自分払'
+                                  : (couple.user1.id === user?.id ? couple.user2.name : couple.user1.name) + '払'
+                                : '割勘'}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">個人</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <div className="flex items-center justify-center gap-2">

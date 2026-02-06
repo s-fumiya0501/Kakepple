@@ -303,13 +303,6 @@ async def update_transaction(
             detail="Transaction not found"
         )
 
-    # Don't allow updating split transactions
-    if transaction.is_split:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot update split transactions"
-        )
-
     # Update fields
     update_data = data.model_dump(exclude_unset=True)
 
