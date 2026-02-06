@@ -4,6 +4,7 @@ from sqlalchemy import or_, and_, func
 from typing import Optional, List
 from datetime import date
 from decimal import Decimal
+import math
 from app.database import get_db
 from app.models.user import User
 from app.models.couple import Couple
@@ -74,7 +75,7 @@ async def create_transaction(
             )
 
         original_amount = data.amount
-        split_amount = original_amount / 2
+        split_amount = Decimal(str(math.ceil(float(original_amount) / 2)))
 
         # Determine who actually paid (default: current user)
         paid_by = data.paid_by_user_id if data.paid_by_user_id else current_user.id
