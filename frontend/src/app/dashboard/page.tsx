@@ -90,7 +90,7 @@ const defaultQuickCategories = [
   { name: '日用品', icon: 'Package', color: 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300' },
   { name: '交通費', icon: 'Car', color: 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300' },
   { name: '交際費', icon: 'Coffee', color: 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300' },
-  { name: '趣味・娯楽', icon: 'Sparkles', color: 'bg-pink-100 text-pink-600 dark:bg-pink-900 dark:text-pink-300' },
+  { name: '娯楽費', icon: 'Sparkles', color: 'bg-pink-100 text-pink-600 dark:bg-pink-900 dark:text-pink-300' },
 ];
 
 // Icon mapping

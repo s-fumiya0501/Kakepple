@@ -64,9 +64,10 @@ export const INCOME_CATEGORIES = [
 
 export const FIXED_EXPENSE_CATEGORIES = [
   "家賃",
-  "電気・ガス・水道",
+  "光熱費",
   "通信費",
-  "サブスク・保険"
+  "保険",
+  "税金"
 ];
 
 export const VARIABLE_EXPENSE_CATEGORIES = [
@@ -76,7 +77,8 @@ export const VARIABLE_EXPENSE_CATEGORIES = [
   "交際費",
   "医療費",
   "被服・美容",
-  "趣味・娯楽"
+  "趣味・娯楽",
+  "サブスク"
 ];
 
 export const ALL_EXPENSE_CATEGORIES = [

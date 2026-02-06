@@ -18,45 +18,13 @@ import {
 } from "@/components/ui/dialog";
 import { transactionApi } from "@/lib/api";
 import { Transaction, INCOME_CATEGORIES, ALL_EXPENSE_CATEGORIES } from "@/types";
-import { Trash2, Plus, Filter, Pencil } from "lucide-react";
+import { Trash2, Plus, Filter, Pencil, TrendingUp, TrendingDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PaidBySelector } from "@/components/PaidBySelector";
 import { PageSkeleton } from "@/components/DashboardSkeleton";
 import { PageLoadingSpinner } from "@/components/ui/loading-spinner";
-
-const categoryColors: Record<string, string> = {
-  '食費': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-  '日用品': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  '交通費': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  '交際費': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-  '趣味・娯楽': 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200',
-  '医療費': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200',
-  '被服・美容': 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900 dark:text-fuchsia-200',
-  '家賃': 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-  '電気・ガス・水道': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-  '通信費': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
-  'サブスク・保険': 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200',
-  '本業': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
-  '副業': 'bg-lime-100 text-lime-800 dark:bg-lime-900 dark:text-lime-200',
-  'アルバイト': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  'パート': 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200',
-  'その他': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
-};
-
-const defaultCategoryColor = 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
-
-function UserAvatar({ name, pictureUrl, size = 'h-10 w-10', textSize = 'text-sm' }: { name: string; pictureUrl?: string | null; size?: string; textSize?: string }) {
-  if (pictureUrl) {
-    return <img src={pictureUrl} alt={name} className={`${size} rounded-full object-cover`} />;
-  }
-  return (
-    <div className={`${size} rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center ${textSize} font-bold text-gray-700 dark:text-gray-200`}>
-      {(name || '?')[0]}
-    </div>
-  );
-}
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -572,42 +540,25 @@ export default function TransactionsPage() {
                       onClick={() => openEditDialog(transaction)}
                       className="w-full flex items-center gap-3 p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 active:bg-gray-100 dark:active:bg-gray-700 transition-colors"
                     >
-                      <div className="flex-shrink-0 relative">
-                        {transaction.is_split && couple ? (
-                          // Split: two overlapping avatars, payer on top
-                          <div className="relative h-10 w-12">
-                            {(() => {
-                              const partner = couple.user1.id === user?.id ? couple.user2 : couple.user1;
-                              const payer = transaction.paid_by_user_id === user?.id ? { name: user?.name || '', pictureUrl: user?.picture_url } : { name: partner.name || '', pictureUrl: partner.picture_url };
-                              const other = transaction.paid_by_user_id === user?.id ? { name: partner.name || '', pictureUrl: partner.picture_url } : { name: user?.name || '', pictureUrl: user?.picture_url };
-                              return (
-                                <>
-                                  <div className="absolute left-0 top-0">
-                                    <UserAvatar name={other.name} pictureUrl={other.pictureUrl} size="h-9 w-9" textSize="text-xs" />
-                                  </div>
-                                  <div className="absolute right-0 top-0.5 ring-2 ring-white dark:ring-gray-800 rounded-full">
-                                    <UserAvatar name={payer.name} pictureUrl={payer.pictureUrl} size="h-9 w-9" textSize="text-xs" />
-                                  </div>
-                                </>
-                              );
-                            })()}
-                          </div>
+                      <div className={`rounded-full p-2.5 flex-shrink-0 ${
+                        transaction.type === 'income'
+                          ? 'bg-green-100 dark:bg-green-900'
+                          : 'bg-red-100 dark:bg-red-900'
+                      }`}>
+                        {transaction.type === 'income' ? (
+                          <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
                         ) : (
-                          // Normal: single user avatar with color ring
-                          <div className={`rounded-full ring-2 ${
-                            transaction.type === 'income'
-                              ? 'ring-green-400 dark:ring-green-600'
-                              : 'ring-red-400 dark:ring-red-600'
-                          }`}>
-                            <UserAvatar name={user?.name || ''} pictureUrl={user?.picture_url} />
-                          </div>
+                          <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${categoryColors[transaction.category] || defaultCategoryColor}`}>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200">
                             {transaction.category}
                           </span>
+                          {transaction.is_split && (
+                            <span className="text-xs text-blue-600 dark:text-blue-400">割勘</span>
+                          )}
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
                           {formattedDate} {transaction.description ? `· ${transaction.description}` : ''}
@@ -650,7 +601,7 @@ export default function TransactionsPage() {
                       >
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{transaction.date}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${categoryColors[transaction.category] || defaultCategoryColor}`}>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200">
                             {transaction.category}
                           </span>
                         </td>
@@ -670,29 +621,7 @@ export default function TransactionsPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          {transaction.is_split && couple ? (
-                            <div className="inline-flex items-center">
-                              <div className="relative h-7 w-10">
-                                {(() => {
-                                  const partner = couple.user1.id === user?.id ? couple.user2 : couple.user1;
-                                  const payer = transaction.paid_by_user_id === user?.id ? { name: user?.name || '', pictureUrl: user?.picture_url } : { name: partner.name || '', pictureUrl: partner.picture_url };
-                                  const other = transaction.paid_by_user_id === user?.id ? { name: partner.name || '', pictureUrl: partner.picture_url } : { name: user?.name || '', pictureUrl: user?.picture_url };
-                                  return (
-                                    <>
-                                      <div className="absolute left-0 top-0">
-                                        <UserAvatar name={other.name} pictureUrl={other.pictureUrl} size="h-7 w-7" textSize="text-[10px]" />
-                                      </div>
-                                      <div className="absolute right-0 top-0 ring-2 ring-white dark:ring-gray-800 rounded-full">
-                                        <UserAvatar name={payer.name} pictureUrl={payer.pictureUrl} size="h-7 w-7" textSize="text-[10px]" />
-                                      </div>
-                                    </>
-                                  );
-                                })()}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-500 dark:text-gray-400">個人</span>
-                          )}
+                          <span className="text-xs text-gray-500 dark:text-gray-400">{transaction.is_split ? 'カップル' : '個人'}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <div className="flex items-center justify-center gap-2">
