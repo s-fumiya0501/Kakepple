@@ -34,32 +34,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      // Fetch user and couple data in parallel
-      const [userRes, coupleRes] = await Promise.allSettled([
-        authApi.me(),
-        coupleApi.getMyCouple(),
-      ]);
+      // Single API call to get user + couple data
+      const res = await authApi.me({ include_couple: true });
+      const data = res.data;
 
-      if (userRes.status === 'fulfilled') {
-        setUser(userRes.value.data);
+      if (data.user) {
+        setUser(data.user);
+        setCouple(data.couple || null);
       } else {
-        // If user fetch fails, clear tokens and redirect
-        authToken.clearTokens();
-        setUser(null);
-        setError('Session expired');
-        return;
-      }
-
-      if (coupleRes.status === 'fulfilled') {
-        setCouple(coupleRes.value.data);
-      } else {
-        setCouple(null);
+        // Backward compatibility: response is the user object directly
+        setUser(data);
+        try {
+          const coupleRes = await coupleApi.getMyCouple();
+          setCouple(coupleRes.data);
+        } catch {
+          setCouple(null);
+        }
       }
 
       setError(null);
     } catch (err) {
       console.error('Failed to fetch auth data:', err);
-      setError('Failed to load user data');
+      authToken.clearTokens();
+      setUser(null);
+      setError('Session expired');
     } finally {
       setLoading(false);
     }

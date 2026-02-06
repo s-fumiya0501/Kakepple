@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, and_, func
 from typing import Optional
 from datetime import date
@@ -109,7 +109,12 @@ async def join_couple(
     invite_code.used_by = current_user.id
 
     db.commit()
-    db.refresh(couple)
+
+    # Re-query with eager loading for response
+    couple = db.query(Couple).options(
+        joinedload(Couple.user1),
+        joinedload(Couple.user2)
+    ).filter(Couple.id == couple.id).first()
 
     return couple
 
@@ -121,7 +126,10 @@ async def get_my_couple(
 ):
     """Get current user's couple information"""
 
-    couple = db.query(Couple).filter(
+    couple = db.query(Couple).options(
+        joinedload(Couple.user1),
+        joinedload(Couple.user2)
+    ).filter(
         or_(
             Couple.user1_id == current_user.id,
             Couple.user2_id == current_user.id
