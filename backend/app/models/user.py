@@ -27,7 +27,7 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
-    transactions = relationship("Transaction", back_populates="user", cascade="all, delete-orphan")
+    transactions = relationship("Transaction", back_populates="user", foreign_keys="Transaction.user_id", cascade="all, delete-orphan")
     invite_codes = relationship("InviteCode", foreign_keys="InviteCode.user_id", back_populates="user", cascade="all, delete-orphan")
     budgets = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
     notification_subscriptions = relationship("NotificationSubscription", back_populates="user", cascade="all, delete-orphan")
