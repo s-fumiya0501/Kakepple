@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { transactionApi, analyticsApi, budgetApi, SavingsData } from "@/lib/api";
+import { transactionApi, analyticsApi, budgetApi, dashboardApi, SavingsData } from "@/lib/api";
 import { getCached, setCache, invalidateCache } from "@/lib/cache";
 import { TransactionSummary, Transaction, Budget, CategoryBreakdown } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -205,121 +205,57 @@ export default function DashboardPage() {
     }
   }, [authLoading, user, router]);
 
-  // Fetch data progressively - each section fetches independently
+  // Fetch all dashboard data in a single batch request
   useEffect(() => {
     if (!user) return;
 
-    const now = new Date();
-    const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-
-    // Fetch summary (highest priority - shows first)
-    const fetchSummary = async () => {
-      // Show cached data immediately
-      const cachedPersonal = getCached<TransactionSummary>('dashboard:personalSummary');
-      const cachedCouple = getCached<TransactionSummary>('dashboard:coupleSummary');
-      if (cachedPersonal) setPersonalSummary(cachedPersonal);
-      if (cachedCouple) setCoupleSummary(cachedCouple);
-      if (cachedPersonal) setLoading(prev => ({ ...prev, summary: false }));
+    const fetchDashboard = async () => {
+      // Show cached data immediately while fetching
+      const cached = getCached<any>('dashboard:batch');
+      if (cached) {
+        applyDashboardData(cached);
+        setLoading({ summary: false, budgets: false, savings: false, charts: false, transactions: false });
+      }
 
       try {
-        const [personalRes, coupleRes] = await Promise.allSettled([
-          transactionApi.summary({ scope: 'personal' }),
-          couple ? transactionApi.summary({ scope: 'couple' }) : Promise.reject('no couple'),
-        ]);
-        if (personalRes.status === 'fulfilled') {
-          setPersonalSummary(personalRes.value.data);
-          setCache('dashboard:personalSummary', personalRes.value.data);
-        }
-        if (coupleRes.status === 'fulfilled') {
-          setCoupleSummary(coupleRes.value.data);
-          setCache('dashboard:coupleSummary', coupleRes.value.data);
-        }
+        const res = await dashboardApi.getData();
+        const data = res.data;
+        setCache('dashboard:batch', data);
+        applyDashboardData(data);
       } catch (e) {
-        console.error('Failed to fetch summary:', e);
+        console.error('Failed to fetch dashboard:', e);
       } finally {
-        setLoading(prev => ({ ...prev, summary: false }));
+        setLoading({ summary: false, budgets: false, savings: false, charts: false, transactions: false });
       }
     };
 
-    // Fetch budgets
-    const fetchBudgets = async () => {
-      try {
-        const [personalRes, coupleRes] = await Promise.allSettled([
-          budgetApi.getCurrentStatus('personal'),
-          couple ? budgetApi.getCurrentStatus('couple') : Promise.reject('no couple'),
-        ]);
-        if (personalRes.status === 'fulfilled') setPersonalBudgets(personalRes.value.data || []);
-        if (coupleRes.status === 'fulfilled') setCoupleBudgets(coupleRes.value.data || []);
-      } catch (e) {
-        console.error('Failed to fetch budgets:', e);
-      } finally {
-        setLoading(prev => ({ ...prev, budgets: false }));
-      }
-    };
-
-    // Fetch savings
-    const fetchSavings = async () => {
-      try {
-        const res = await analyticsApi.savings();
-        setSavings(res.data);
-      } catch (e) {
-        console.error('Failed to fetch savings:', e);
-      } finally {
-        setLoading(prev => ({ ...prev, savings: false }));
-      }
-    };
-
-    // Fetch charts data (lower priority - can load later)
-    const fetchCharts = async () => {
-      try {
-        const [categoryRes, trendsRes] = await Promise.allSettled([
-          analyticsApi.categoryAnalysis({ start_date: startDate, end_date: endDate, scope: 'personal' }),
-          analyticsApi.monthlyTrends({ year: now.getFullYear(), scope: 'personal' }),
-        ]);
-
-        if (categoryRes.status === 'fulfilled') {
-          setExpenseBreakdown(categoryRes.value.data.expense_breakdown || []);
-        }
-
-        if (trendsRes.status === 'fulfilled') {
-          const currentMonth = now.getMonth() + 1;
-          const last6Months = trendsRes.value.data
-            .filter((m: any) => m.month <= currentMonth)
-            .slice(-6)
-            .map((m: any) => ({
-              month: m.month_name,
-              収入: parseFloat(m.total_income),
-              支出: parseFloat(m.total_expense)
-            }));
-          setMonthlyTrends(last6Months);
-        }
-      } catch (e) {
-        console.error('Failed to fetch charts:', e);
-      } finally {
-        setLoading(prev => ({ ...prev, charts: false }));
-      }
-    };
-
-    // Fetch recent transactions
-    const fetchTransactions = async () => {
-      try {
-        const res = await transactionApi.list({ scope: 'personal', limit: 5 });
-        setRecentTransactions(res.data);
-      } catch (e) {
-        console.error('Failed to fetch transactions:', e);
-      } finally {
-        setLoading(prev => ({ ...prev, transactions: false }));
-      }
-    };
-
-    // Start all fetches in parallel
-    fetchSummary();
-    fetchBudgets();
-    fetchSavings();
-    fetchCharts();
-    fetchTransactions();
+    fetchDashboard();
   }, [user, couple]);
+
+  // Apply batch data to state
+  const applyDashboardData = useCallback((data: any) => {
+    if (data.personal_summary) setPersonalSummary(data.personal_summary);
+    if (data.couple_summary) setCoupleSummary(data.couple_summary);
+    if (data.personal_budgets) setPersonalBudgets(data.personal_budgets);
+    if (data.couple_budgets) setCoupleBudgets(data.couple_budgets);
+    if (data.savings) setSavings(data.savings);
+    if (data.expense_breakdown) setExpenseBreakdown(data.expense_breakdown);
+    if (data.recent_transactions) setRecentTransactions(data.recent_transactions);
+
+    if (data.monthly_trends) {
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+      const last6Months = data.monthly_trends
+        .filter((m: any) => m.month <= currentMonth)
+        .slice(-6)
+        .map((m: any) => ({
+          month: m.month_name,
+          収入: parseFloat(m.total_income),
+          支出: parseFloat(m.total_expense)
+        }));
+      setMonthlyTrends(last6Months);
+    }
+  }, []);
 
   const formatCurrency = useCallback((amount: string | number) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;

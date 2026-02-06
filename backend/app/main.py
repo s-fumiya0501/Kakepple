@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from pathlib import Path
 from app.config import settings
 
@@ -31,6 +32,9 @@ async def fix_scheme_middleware(request: Request, call_next):
         request.scope["scheme"] = "https"
     response = await call_next(request)
     return response
+
+# Add GZip compression (compress responses > 500 bytes)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Add SessionMiddleware first (will be inner layer)
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
@@ -77,7 +81,7 @@ async def cors_test():
 
 
 # Import and include routers
-from app.api import auth, couples, transactions, budgets, analytics, exports, notifications, admin, recurring, assets
+from app.api import auth, couples, transactions, budgets, analytics, exports, notifications, admin, recurring, assets, dashboard
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(couples.router, prefix="/api/couples", tags=["couples"])
@@ -89,3 +93,4 @@ app.include_router(notifications.router, prefix="/api/notifications", tags=["not
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(recurring.router, prefix="/api/recurring", tags=["recurring"])
 app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])

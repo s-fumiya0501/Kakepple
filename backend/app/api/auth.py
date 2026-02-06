@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from authlib.integrations.starlette_client import OAuth
@@ -17,9 +17,10 @@ from pathlib import Path
 
 from app.database import get_db
 from app.models.user import User
+from app.models.couple import Couple
 from app.schemas.user import UserResponse
 from app.core.security import create_session, delete_session, get_redis_client, create_tokens, verify_token
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, invalidate_user_cache
 from app.config import settings
 
 router = APIRouter()
@@ -593,10 +594,36 @@ async def line_callback(request: Request, code: str = None, state: str = None, e
 
 # ==================== User Info & Logout ====================
 
-@router.get("/me", response_model=UserResponse)
-async def get_current_user_info(current_user: User = Depends(get_current_user)):
-    """Get current authenticated user information"""
-    return current_user
+@router.get("/me")
+async def get_current_user_info(
+    include_couple: bool = Query(False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get current authenticated user information, optionally with couple data"""
+    from app.schemas.couple import CoupleResponse as CoupleSchemaResponse
+    from sqlalchemy.orm import joinedload
+    from sqlalchemy import or_
+
+    user_data = UserResponse.model_validate(current_user)
+
+    if not include_couple:
+        return user_data
+
+    couple = db.query(Couple).options(
+        joinedload(Couple.user1),
+        joinedload(Couple.user2)
+    ).filter(
+        or_(
+            Couple.user1_id == current_user.id,
+            Couple.user2_id == current_user.id
+        )
+    ).first()
+
+    return {
+        "user": user_data,
+        "couple": CoupleSchemaResponse.model_validate(couple) if couple else None,
+    }
 
 
 @router.put("/me", response_model=UserResponse)
@@ -611,6 +638,7 @@ async def update_user_profile(
 
     db.commit()
     db.refresh(current_user)
+    invalidate_user_cache(str(current_user.id))
     return current_user
 
 
@@ -663,6 +691,7 @@ async def upload_avatar(
     current_user.picture_url = f"/uploads/avatars/{filename}"
     db.commit()
     db.refresh(current_user)
+    invalidate_user_cache(str(current_user.id))
 
     return current_user
 
@@ -682,6 +711,7 @@ async def delete_avatar(
     current_user.picture_url = None
     db.commit()
     db.refresh(current_user)
+    invalidate_user_cache(str(current_user.id))
 
     return current_user
 
