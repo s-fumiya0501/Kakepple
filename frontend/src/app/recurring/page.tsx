@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from "react";
+import { toast } from '@/hooks/use-toast';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useRouter } from "next/navigation";
 import MainLayout from "@/components/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -51,6 +53,10 @@ export default function RecurringPage() {
   const [formDayOfWeek, setFormDayOfWeek] = useState<string>('0');
   const [formIsSplit, setFormIsSplit] = useState<boolean>(false);
   const [formLoading, setFormLoading] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingRecurringId, setDeletingRecurringId] = useState<string | null>(null);
+  const [executeConfirmOpen, setExecuteConfirmOpen] = useState(false);
+  const [executingRecurringId, setExecutingRecurringId] = useState<string | null>(null);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -91,7 +97,7 @@ export default function RecurringPage() {
 
   const handleSubmit = async () => {
     if (!formCategory || !formAmount) {
-      alert('カテゴリーと金額を入力してください');
+      toast({ title: '入力エラー', description: 'カテゴリーと金額を入力してください', variant: 'destructive' });
       return;
     }
 
@@ -126,7 +132,7 @@ export default function RecurringPage() {
       fetchData();
     } catch (error: any) {
       console.error('Failed to save recurring transaction:', error);
-      alert(error.response?.data?.detail || '繰り返し取引の保存に失敗しました');
+      toast({ title: 'エラー', description: error.response?.data?.detail || '繰り返し取引の保存に失敗しました', variant: 'destructive' });
     } finally {
       setFormLoading(false);
     }
@@ -146,16 +152,21 @@ export default function RecurringPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('この繰り返し取引を削除しますか？')) {
-      return;
-    }
+    setDeletingRecurringId(id);
+    setDeleteConfirmOpen(true);
+  };
 
+  const confirmDeleteRecurring = async () => {
+    if (!deletingRecurringId) return;
     try {
-      await recurringApi.delete(id);
+      await recurringApi.delete(deletingRecurringId);
       fetchData();
     } catch (error) {
       console.error('Failed to delete recurring transaction:', error);
-      alert('削除に失敗しました');
+      toast({ title: 'エラー', description: '削除に失敗しました', variant: 'destructive' });
+    } finally {
+      setDeleteConfirmOpen(false);
+      setDeletingRecurringId(null);
     }
   };
 
@@ -165,21 +176,26 @@ export default function RecurringPage() {
       fetchData();
     } catch (error) {
       console.error('Failed to toggle recurring transaction:', error);
-      alert('更新に失敗しました');
+      toast({ title: 'エラー', description: '更新に失敗しました', variant: 'destructive' });
     }
   };
 
   const handleExecute = async (id: string) => {
-    if (!confirm('この繰り返し取引を今すぐ実行しますか？')) {
-      return;
-    }
+    setExecutingRecurringId(id);
+    setExecuteConfirmOpen(true);
+  };
 
+  const confirmExecuteRecurring = async () => {
+    if (!executingRecurringId) return;
     try {
-      await recurringApi.execute(id);
+      await recurringApi.execute(executingRecurringId);
       fetchData();
     } catch (error) {
       console.error('Failed to execute recurring transaction:', error);
-      alert('実行に失敗しました');
+      toast({ title: 'エラー', description: '実行に失敗しました', variant: 'destructive' });
+    } finally {
+      setExecuteConfirmOpen(false);
+      setExecutingRecurringId(null);
     }
   };
 
@@ -578,6 +594,22 @@ export default function RecurringPage() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="この繰り返し取引を削除しますか？"
+        confirmLabel="削除"
+        variant="danger"
+        onConfirm={confirmDeleteRecurring}
+      />
+      <ConfirmDialog
+        open={executeConfirmOpen}
+        onOpenChange={setExecuteConfirmOpen}
+        title="この繰り返し取引を今すぐ実行しますか？"
+        confirmLabel="実行"
+        variant="danger"
+        onConfirm={confirmExecuteRecurring}
+      />
     </MainLayout>
   );
 }

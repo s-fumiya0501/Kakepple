@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { analyticsApi, exportApi } from '@/lib/api';
@@ -80,7 +81,7 @@ export default function ReportsPage() {
       link.remove();
     } catch (err) {
       console.error('Failed to download CSV:', err);
-      alert('CSVファイルのダウンロードを開始します');
+      toast({ title: 'エラー', description: 'CSVファイルのダウンロードに失敗しました', variant: 'destructive' });
     }
   };
 

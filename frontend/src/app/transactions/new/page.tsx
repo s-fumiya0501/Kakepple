@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import { toast } from '@/hooks/use-toast';
 import { useRouter } from "next/navigation";
 import MainLayout from "@/components/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,7 +56,7 @@ export default function NewTransactionPage() {
     e.preventDefault();
 
     if (!category || !amount || !date) {
-      alert('すべての必須項目を入力してください');
+      toast({ title: '入力エラー', description: 'すべての必須項目を入力してください', variant: 'destructive' });
       return;
     }
 
@@ -71,11 +72,11 @@ export default function NewTransactionPage() {
         is_split: isSplit && couple !== null,
       });
 
-      alert('取引を登録しました');
+      toast({ title: '完了', description: '取引を登録しました', variant: 'success' });
       router.push('/transactions');
     } catch (error: any) {
       console.error('Failed to create transaction:', error);
-      alert(error.response?.data?.detail || '取引の登録に失敗しました');
+      toast({ title: 'エラー', description: error.response?.data?.detail || '取引の登録に失敗しました', variant: 'destructive' });
       setSubmitting(false);
     }
   };

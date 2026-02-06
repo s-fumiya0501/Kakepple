@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from '@/hooks/use-toast';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useRouter } from 'next/navigation';
 import { budgetApi } from '@/lib/api';
 import { Budget, ALL_EXPENSE_CATEGORIES } from '@/types';
@@ -37,6 +39,8 @@ export default function BudgetsPage() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [formLoading, setFormLoading] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingBudgetId, setDeletingBudgetId] = useState<string | null>(null);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -73,11 +77,11 @@ export default function BudgetsPage() {
 
   const handleCreateBudget = async () => {
     if (!amount) {
-      alert('金額を入力してください');
+      toast({ title: '入力エラー', description: '金額を入力してください', variant: 'destructive' });
       return;
     }
     if (budgetType === 'category' && !category) {
-      alert('カテゴリを選択してください');
+      toast({ title: '入力エラー', description: 'カテゴリを選択してください', variant: 'destructive' });
       return;
     }
 
@@ -95,19 +99,27 @@ export default function BudgetsPage() {
       resetForm();
       loadBudgets();
     } catch (err: any) {
-      alert(err.response?.data?.detail || '予算の作成に失敗しました');
+      toast({ title: 'エラー', description: err.response?.data?.detail || '予算の作成に失敗しました', variant: 'destructive' });
     } finally {
       setFormLoading(false);
     }
   };
 
   const handleDeleteBudget = async (id: string) => {
-    if (!confirm('この予算を削除しますか？')) return;
+    setDeletingBudgetId(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteBudget = async () => {
+    if (!deletingBudgetId) return;
     try {
-      await budgetApi.delete(id);
+      await budgetApi.delete(deletingBudgetId);
       loadBudgets();
     } catch (err: any) {
-      alert(err.response?.data?.detail || '予算の削除に失敗しました');
+      toast({ title: 'エラー', description: err.response?.data?.detail || '予算の削除に失敗しました', variant: 'destructive' });
+    } finally {
+      setDeleteConfirmOpen(false);
+      setDeletingBudgetId(null);
     }
   };
 
@@ -402,6 +414,14 @@ export default function BudgetsPage() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="この予算を削除しますか？"
+        confirmLabel="削除"
+        variant="danger"
+        onConfirm={confirmDeleteBudget}
+      />
     </MainLayout>
   );
 }

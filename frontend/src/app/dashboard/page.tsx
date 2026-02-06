@@ -17,11 +17,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { transactionApi, analyticsApi, budgetApi, SavingsData } from "@/lib/api";
+import { getCached, setCache, invalidateCache } from "@/lib/cache";
 import { TransactionSummary, Transaction, Budget, CategoryBreakdown } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageLoadingSpinner, ChartLoadingSpinner } from "@/components/ui/loading-spinner";
 import { SummaryCard, BudgetCard, AssetCard } from "@/components/dashboard";
+import { toast } from "@/hooks/use-toast";
 import {
   TrendingUp,
   TrendingDown,
@@ -46,6 +48,8 @@ import {
   Shirt,
   Zap,
   Target,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { format, endOfMonth } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -170,6 +174,9 @@ export default function DashboardPage() {
   const [quickInputIsSplit, setQuickInputIsSplit] = useState(false);
   const [quickInputLoading, setQuickInputLoading] = useState(false);
 
+  // Charts expanded state (collapsed by default on mobile)
+  const [chartsExpanded, setChartsExpanded] = useState(false);
+
   // Custom category states
   const [quickCategories, setQuickCategories] = useState<QuickCategory[]>(defaultQuickCategories);
   const [categorySettingsOpen, setCategorySettingsOpen] = useState(false);
@@ -206,13 +213,26 @@ export default function DashboardPage() {
 
     // Fetch summary (highest priority - shows first)
     const fetchSummary = async () => {
+      // Show cached data immediately
+      const cachedPersonal = getCached<TransactionSummary>('dashboard:personalSummary');
+      const cachedCouple = getCached<TransactionSummary>('dashboard:coupleSummary');
+      if (cachedPersonal) setPersonalSummary(cachedPersonal);
+      if (cachedCouple) setCoupleSummary(cachedCouple);
+      if (cachedPersonal) setLoading(prev => ({ ...prev, summary: false }));
+
       try {
         const [personalRes, coupleRes] = await Promise.allSettled([
           transactionApi.summary({ scope: 'personal' }),
           couple ? transactionApi.summary({ scope: 'couple' }) : Promise.reject('no couple'),
         ]);
-        if (personalRes.status === 'fulfilled') setPersonalSummary(personalRes.value.data);
-        if (coupleRes.status === 'fulfilled') setCoupleSummary(coupleRes.value.data);
+        if (personalRes.status === 'fulfilled') {
+          setPersonalSummary(personalRes.value.data);
+          setCache('dashboard:personalSummary', personalRes.value.data);
+        }
+        if (coupleRes.status === 'fulfilled') {
+          setCoupleSummary(coupleRes.value.data);
+          setCache('dashboard:coupleSummary', coupleRes.value.data);
+        }
       } catch (e) {
         console.error('Failed to fetch summary:', e);
       } finally {
@@ -360,7 +380,14 @@ export default function DashboardPage() {
       setQuickInputDescription('');
       setQuickInputIsSplit(false);
 
-      // Refresh summary and transactions
+      toast({
+        title: "登録完了",
+        description: `${quickInputCategory} ¥${parseFloat(quickInputAmount).toLocaleString()} を記録しました`,
+        variant: "success",
+      });
+
+      // Invalidate cache and refresh
+      invalidateCache('dashboard:');
       const [summaryRes, transactionsRes] = await Promise.allSettled([
         transactionApi.summary({ scope: 'personal' }),
         transactionApi.list({ scope: 'personal', limit: 5 }),
@@ -369,7 +396,11 @@ export default function DashboardPage() {
       if (transactionsRes.status === 'fulfilled') setRecentTransactions(transactionsRes.value.data);
     } catch (error) {
       console.error('Failed to create transaction:', error);
-      alert('登録に失敗しました');
+      toast({
+        title: "エラー",
+        description: "登録に失敗しました",
+        variant: "destructive",
+      });
     } finally {
       setQuickInputLoading(false);
     }
@@ -453,6 +484,45 @@ export default function DashboardPage() {
           </p>
         </div>
 
+        {/* Quick Input - モバイルではダッシュボード上部に表示 */}
+        <div className="rounded-lg bg-white p-4 md:p-6 shadow dark:bg-gray-800 md:order-none order-first">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              クイック入力
+            </h2>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setCategorySettingsOpen(true)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                title="カテゴリ設定"
+              >
+                <Settings className="h-5 w-5" />
+              </button>
+              <Link
+                href="/transactions/new"
+                className="text-sm text-pink-600 hover:text-pink-700 dark:text-pink-400"
+              >
+                詳細入力
+              </Link>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            {quickCategories.map((category, index) => {
+              const Icon = iconMap[category.icon] || ShoppingCart;
+              return (
+                <button
+                  key={`${category.name}-${index}`}
+                  onClick={() => openQuickInput(category.name)}
+                  className={`flex flex-col items-center rounded-lg p-3 md:p-4 ${category.color} hover:opacity-80 transition-opacity active:scale-95`}
+                >
+                  <Icon className="h-6 w-6" />
+                  <span className="mt-1.5 text-sm font-medium">{category.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Main: Personal and Couple 2-column layout */}
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Personal Section */}
@@ -484,13 +554,13 @@ export default function DashboardPage() {
 
             {/* Income/Expense/Balance */}
             {loading.summary ? (
-              <div className="grid gap-3 grid-cols-3">
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
                 <Skeleton className="h-24 rounded-lg" />
                 <Skeleton className="h-24 rounded-lg" />
                 <Skeleton className="h-24 rounded-lg" />
               </div>
             ) : (
-              <div className="grid gap-3 grid-cols-3">
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
                 <SummaryCard
                   label="収入"
                   value={personalStats.income}
@@ -582,13 +652,13 @@ export default function DashboardPage() {
 
                 {/* Income/Expense/Balance */}
                 {loading.summary ? (
-                  <div className="grid gap-3 grid-cols-3">
+                  <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
                     <Skeleton className="h-24 rounded-lg" />
                     <Skeleton className="h-24 rounded-lg" />
                     <Skeleton className="h-24 rounded-lg" />
                   </div>
                 ) : (
-                  <div className="grid gap-3 grid-cols-3">
+                  <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
                     <SummaryCard
                       label="収入"
                       value={coupleStats.income}
@@ -672,92 +742,16 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Quick Input */}
-        <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              クイック入力
-            </h2>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setCategorySettingsOpen(true)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                title="カテゴリ設定"
-              >
-                <Settings className="h-5 w-5" />
-              </button>
-              <Link
-                href="/transactions/new"
-                className="text-sm text-pink-600 hover:text-pink-700 dark:text-pink-400"
-              >
-                詳細入力
-              </Link>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-            {quickCategories.map((category, index) => {
-              const Icon = iconMap[category.icon] || ShoppingCart;
-              return (
-                <button
-                  key={`${category.name}-${index}`}
-                  onClick={() => openQuickInput(category.name)}
-                  className={`flex flex-col items-center rounded-lg p-4 ${category.color} hover:opacity-80 transition-opacity`}
-                >
-                  <Icon className="h-6 w-6" />
-                  <span className="mt-2 text-sm font-medium">{category.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-            クイックアクセス
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Link
-              href="/transactions"
-              className="flex items-center gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-            >
-              <div className="rounded-full bg-pink-100 p-2 dark:bg-pink-900">
-                <TrendingDown className="h-5 w-5 text-pink-600 dark:text-pink-400" />
-              </div>
-              <span className="font-medium text-gray-900 dark:text-white">取引一覧</span>
-            </Link>
-            <Link
-              href="/budgets"
-              className="flex items-center gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-            >
-              <div className="rounded-full bg-emerald-100 p-2 dark:bg-emerald-900">
-                <Target className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <span className="font-medium text-gray-900 dark:text-white">予算管理</span>
-            </Link>
-            <Link
-              href="/analytics"
-              className="flex items-center gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-            >
-              <div className="rounded-full bg-purple-100 p-2 dark:bg-purple-900">
-                <TrendingUp className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              </div>
-              <span className="font-medium text-gray-900 dark:text-white">分析</span>
-            </Link>
-            <Link
-              href="/assets"
-              className="flex items-center gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-            >
-              <div className="rounded-full bg-amber-100 p-2 dark:bg-amber-900">
-                <PiggyBank className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-              </div>
-              <span className="font-medium text-gray-900 dark:text-white">資産管理</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* Charts */}
-        <div className="grid gap-6 lg:grid-cols-2">
+        {/* Charts - モバイルでは折りたたみ */}
+        <div>
+          <button
+            onClick={() => setChartsExpanded(!chartsExpanded)}
+            className="flex items-center gap-2 mb-4 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors md:hidden"
+          >
+            {chartsExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+            <span className="text-sm font-medium">グラフを{chartsExpanded ? '閉じる' : '表示する'}</span>
+          </button>
+          <div className={`grid gap-6 lg:grid-cols-2 ${chartsExpanded ? '' : 'hidden md:grid'}`}>
           {/* Expense Pie Chart */}
           <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
             <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
@@ -780,6 +774,7 @@ export default function DashboardPage() {
             ) : (
               <MonthlyTrendsChart data={monthlyTrends} formatCurrency={formatCurrency} />
             )}
+          </div>
           </div>
         </div>
 

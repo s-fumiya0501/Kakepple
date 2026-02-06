@@ -18,8 +18,10 @@ import {
 } from "@/components/ui/dialog";
 import { transactionApi } from "@/lib/api";
 import { Transaction, INCOME_CATEGORIES, ALL_EXPENSE_CATEGORIES } from "@/types";
-import { Trash2, Plus, Filter, Pencil } from "lucide-react";
+import { Trash2, Plus, Filter, Pencil, TrendingUp, TrendingDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PageSkeleton } from "@/components/DashboardSkeleton";
 import { PageLoadingSpinner } from "@/components/ui/loading-spinner";
 
@@ -45,6 +47,10 @@ export default function TransactionsPage() {
   const [formDescription, setFormDescription] = useState('');
   const [formIsSplit, setFormIsSplit] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
+
+  // Delete confirmation state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   // Edit form state
   const [editFormType, setEditFormType] = useState<'income' | 'expense'>('expense');
@@ -95,23 +101,40 @@ export default function TransactionsPage() {
     }
   }, [user, fetchTransactions]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('この取引を削除しますか？')) {
-      return;
-    }
+  const requestDelete = (id: string) => {
+    setDeleteTargetId(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTargetId) return;
 
     try {
-      await transactionApi.delete(id);
+      await transactionApi.delete(deleteTargetId);
+      toast({
+        title: "削除しました",
+        variant: "success",
+      });
       fetchTransactions();
     } catch (error) {
       console.error('Failed to delete transaction:', error);
-      alert('取引の削除に失敗しました');
+      toast({
+        title: "エラー",
+        description: "取引の削除に失敗しました",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteTargetId(null);
     }
   };
 
   const handleSubmit = async (continueAdding: boolean = false) => {
     if (!formCategory || !formAmount) {
-      alert('カテゴリーと金額は必須です');
+      toast({
+        title: "入力エラー",
+        description: "カテゴリーと金額は必須です",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -126,8 +149,13 @@ export default function TransactionsPage() {
         is_split: formType === 'expense' ? formIsSplit : false,
       });
 
+      toast({
+        title: "登録完了",
+        description: `${formCategory} ¥${parseFloat(formAmount).toLocaleString()} を記録しました`,
+        variant: "success",
+      });
+
       if (continueAdding) {
-        // 続けて登録: カテゴリと日付は保持、金額と説明をクリア
         setFormAmount('');
         setFormDescription('');
       } else {
@@ -137,7 +165,11 @@ export default function TransactionsPage() {
       fetchTransactions();
     } catch (error) {
       console.error('Failed to create transaction:', error);
-      alert('登録に失敗しました');
+      toast({
+        title: "エラー",
+        description: "登録に失敗しました",
+        variant: "destructive",
+      });
     } finally {
       setFormLoading(false);
     }
@@ -165,7 +197,11 @@ export default function TransactionsPage() {
 
   const handleEditSubmit = async () => {
     if (!editingTransaction || !editFormCategory || !editFormAmount) {
-      alert('カテゴリーと金額は必須です');
+      toast({
+        title: "入力エラー",
+        description: "カテゴリーと金額は必須です",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -180,12 +216,22 @@ export default function TransactionsPage() {
         is_split: editFormType === 'expense' ? editFormIsSplit : false,
       });
 
+      toast({
+        title: "更新完了",
+        description: `${editFormCategory} ¥${parseFloat(editFormAmount).toLocaleString()} を更新しました`,
+        variant: "success",
+      });
+
       setIsEditDialogOpen(false);
       setEditingTransaction(null);
       fetchTransactions();
     } catch (error) {
       console.error('Failed to update transaction:', error);
-      alert('更新に失敗しました');
+      toast({
+        title: "エラー",
+        description: "更新に失敗しました",
+        variant: "destructive",
+      });
     } finally {
       setEditFormLoading(false);
     }
@@ -455,120 +501,131 @@ export default function TransactionsPage() {
           </div>
         </div>
 
-        {/* Transactions Table */}
+        {/* Transactions - モバイル: カードリスト / デスクトップ: テーブル */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
-                    日付
-                  </th>
-                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    カテゴリー
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
-                    説明
-                  </th>
-                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden sm:table-cell">
-                    種類
-                  </th>
-                  <th className="px-3 md:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    金額
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
-                    範囲
-                  </th>
-                  <th className="px-2 md:px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+          {transactions.length === 0 ? (
+            <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+              取引がありません
+            </div>
+          ) : (
+            <>
+              {/* モバイル: カードリスト */}
+              <div className="md:hidden divide-y divide-gray-100 dark:divide-gray-700">
+                {transactions.map((transaction) => {
+                  const date = new Date(transaction.date);
+                  const formattedDate = `${date.getMonth() + 1}/${date.getDate()}`;
+                  return (
+                    <button
+                      key={transaction.id}
+                      onClick={() => openEditDialog(transaction)}
+                      className="w-full flex items-center gap-3 p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 active:bg-gray-100 dark:active:bg-gray-700 transition-colors"
+                    >
+                      <div className={`rounded-full p-2.5 flex-shrink-0 ${
+                        transaction.type === 'income'
+                          ? 'bg-green-100 dark:bg-green-900'
+                          : 'bg-red-100 dark:bg-red-900'
+                      }`}>
+                        {transaction.type === 'income' ? (
+                          <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200">
+                            {transaction.category}
+                          </span>
+                          {transaction.is_split && (
+                            <span className="text-xs text-blue-600 dark:text-blue-400">割勘</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                          {formattedDate} {transaction.description ? `· ${transaction.description}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex-shrink-0 text-right">
+                        <p className={`text-base font-bold ${
+                          transaction.type === 'income'
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-red-600 dark:text-red-400'
+                        }`}>
+                          {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
 
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {transactions.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                      取引がありません
-                    </td>
-                  </tr>
-                ) : (
-                  transactions.map((transaction) => {
-                    const date = new Date(transaction.date);
-                    const formattedDate = `${date.getMonth() + 1}/${date.getDate()}`;
-                    const fullDate = transaction.date;
-                    return (
+              {/* デスクトップ: テーブル */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">日付</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">カテゴリー</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">説明</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">種類</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">金額</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">範囲</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {transactions.map((transaction) => (
                       <tr
                         key={transaction.id}
                         className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                         onClick={() => openEditDialog(transaction)}
                       >
-                        <td className="px-3 md:px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                          <span className="md:hidden">{formattedDate}</span>
-                          <span className="hidden md:inline">{fullDate}</span>
-                        </td>
-                        <td className="px-3 md:px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{transaction.date}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200">
                             {transaction.category}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-300 hidden md:table-cell">
-                          {transaction.description || '-'}
-                        </td>
-                        <td className="px-3 md:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              transaction.type === 'income'
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                            }`}
-                          >
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-300">{transaction.description || '-'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            transaction.type === 'income'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          }`}>
                             {transaction.type === 'income' ? '収入' : '支出'}
                           </span>
                         </td>
-                        <td className="px-3 md:px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                          <span
-                            className={
-                              transaction.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                            }
-                          >
-                            {transaction.type === 'income' ? '+' : '-'}
-                            {formatCurrency(transaction.amount)}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
+                          <span className={transaction.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                            {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center hidden md:table-cell">
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {transaction.is_split ? 'カップル' : '個人'}
-                          </span>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">{transaction.is_split ? 'カップル' : '個人'}</span>
                         </td>
-                        <td className="px-2 md:px-6 py-4 whitespace-nowrap text-center">
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
                           <div className="flex items-center justify-center gap-2">
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openEditDialog(transaction);
-                              }}
-                              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                              onClick={(e) => { e.stopPropagation(); openEditDialog(transaction); }}
+                              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-1"
                             >
                               <Pencil className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(transaction.id);
-                              }}
-                              className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                              onClick={(e) => { e.stopPropagation(); requestDelete(transaction.id); }}
+                              className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
                         </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Edit Transaction Dialog */}
@@ -706,6 +763,19 @@ export default function TransactionsPage() {
                 <Button
                   type="button"
                   variant="outline"
+                  onClick={() => {
+                    if (editingTransaction) {
+                      setIsEditDialogOpen(false);
+                      requestDelete(editingTransaction.id);
+                    }
+                  }}
+                  className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => setIsEditDialogOpen(false)}
                   className="flex-1"
                 >
@@ -723,6 +793,17 @@ export default function TransactionsPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          open={deleteConfirmOpen}
+          onOpenChange={setDeleteConfirmOpen}
+          title="取引を削除しますか？"
+          description="この操作は取り消せません"
+          confirmLabel="削除する"
+          variant="danger"
+          onConfirm={handleDelete}
+        />
       </div>
     </MainLayout>
   );
