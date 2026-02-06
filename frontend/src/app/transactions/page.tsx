@@ -47,9 +47,18 @@ const categoryColors: Record<string, string> = {
 
 const defaultCategoryColor = 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
 
+const AVATAR_BASE_URL = 'https://kakepple-production.up.railway.app';
+
+function resolveAvatarUrl(url: string): string {
+  if (url.startsWith('/')) {
+    return `${AVATAR_BASE_URL}${url}`;
+  }
+  return url;
+}
+
 function UserAvatar({ name, pictureUrl, size = 'h-10 w-10', textSize = 'text-sm' }: { name: string; pictureUrl?: string | null; size?: string; textSize?: string }) {
   if (pictureUrl) {
-    return <img src={pictureUrl} alt={name || ''} className={`${size} rounded-full object-cover`} />;
+    return <img src={resolveAvatarUrl(pictureUrl)} alt={name || ''} className={`${size} rounded-full object-cover`} />;
   }
   const initial = (name && name.length > 0) ? name[0] : '?';
   return (
