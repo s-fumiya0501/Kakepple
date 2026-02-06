@@ -145,7 +145,8 @@ export const authApi = {
     api.get<OAuthPendingInfo>(`/api/auth/oauth/pending/${pendingId}`),
 
   // User info
-  me: () => api.get('/api/auth/me'),
+  me: (params?: { include_couple?: boolean }) =>
+    api.get('/api/auth/me', { params }),
   logout: () => api.post('/api/auth/logout'),
 
   // Profile management
@@ -296,6 +297,11 @@ export const analyticsApi = {
     scope?: 'personal' | 'couple';
   }) => api.get('/api/analytics/report/yearly', { params }),
   savings: () => api.get<SavingsData>('/api/analytics/savings'),
+};
+
+// Dashboard batch endpoint
+export const dashboardApi = {
+  getData: () => api.get('/api/dashboard/data'),
 };
 
 // Export endpoints
