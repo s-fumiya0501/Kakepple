@@ -47,13 +47,23 @@ const categoryColors: Record<string, string> = {
 
 const defaultCategoryColor = 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
 
+const AVATAR_BASE_URL = 'https://kakepple-production.up.railway.app';
+
+function resolveAvatarUrl(url: string): string {
+  if (url.startsWith('/')) {
+    return `${AVATAR_BASE_URL}${url}`;
+  }
+  return url;
+}
+
 function UserAvatar({ name, pictureUrl, size = 'h-10 w-10', textSize = 'text-sm' }: { name: string; pictureUrl?: string | null; size?: string; textSize?: string }) {
   if (pictureUrl) {
-    return <img src={pictureUrl} alt={name} className={`${size} rounded-full object-cover`} />;
+    return <img src={resolveAvatarUrl(pictureUrl)} alt={name || ''} className={`${size} rounded-full object-cover`} />;
   }
+  const initial = (name && name.length > 0) ? name[0] : '?';
   return (
     <div className={`${size} rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center ${textSize} font-bold text-gray-700 dark:text-gray-200`}>
-      {(name || '?')[0]}
+      {initial}
     </div>
   );
 }
@@ -578,8 +588,12 @@ export default function TransactionsPage() {
                           <div className="relative h-10 w-12">
                             {(() => {
                               const partner = couple.user1.id === user?.id ? couple.user2 : couple.user1;
-                              const payer = transaction.paid_by_user_id === user?.id ? { name: user?.name || '', pictureUrl: user?.picture_url } : { name: partner.name || '', pictureUrl: partner.picture_url };
-                              const other = transaction.paid_by_user_id === user?.id ? { name: partner.name || '', pictureUrl: partner.picture_url } : { name: user?.name || '', pictureUrl: user?.picture_url };
+                              const payer = transaction.paid_by_user_id === user?.id
+                                ? { name: user?.name || user?.email || '', pictureUrl: user?.picture_url }
+                                : { name: partner.name || partner.email || '', pictureUrl: partner.picture_url };
+                              const other = transaction.paid_by_user_id === user?.id
+                                ? { name: partner.name || partner.email || '', pictureUrl: partner.picture_url }
+                                : { name: user?.name || user?.email || '', pictureUrl: user?.picture_url };
                               return (
                                 <>
                                   <div className="absolute left-0 top-0">
@@ -599,7 +613,7 @@ export default function TransactionsPage() {
                               ? 'ring-green-400 dark:ring-green-600'
                               : 'ring-red-400 dark:ring-red-600'
                           }`}>
-                            <UserAvatar name={user?.name || ''} pictureUrl={user?.picture_url} />
+                            <UserAvatar name={user?.name || user?.email || ''} pictureUrl={user?.picture_url} />
                           </div>
                         )}
                       </div>
@@ -675,8 +689,12 @@ export default function TransactionsPage() {
                               <div className="relative h-7 w-10">
                                 {(() => {
                                   const partner = couple.user1.id === user?.id ? couple.user2 : couple.user1;
-                                  const payer = transaction.paid_by_user_id === user?.id ? { name: user?.name || '', pictureUrl: user?.picture_url } : { name: partner.name || '', pictureUrl: partner.picture_url };
-                                  const other = transaction.paid_by_user_id === user?.id ? { name: partner.name || '', pictureUrl: partner.picture_url } : { name: user?.name || '', pictureUrl: user?.picture_url };
+                                  const payer = transaction.paid_by_user_id === user?.id
+                                    ? { name: user?.name || user?.email || '', pictureUrl: user?.picture_url }
+                                    : { name: partner.name || partner.email || '', pictureUrl: partner.picture_url };
+                                  const other = transaction.paid_by_user_id === user?.id
+                                    ? { name: partner.name || partner.email || '', pictureUrl: partner.picture_url }
+                                    : { name: user?.name || user?.email || '', pictureUrl: user?.picture_url };
                                   return (
                                     <>
                                       <div className="absolute left-0 top-0">
