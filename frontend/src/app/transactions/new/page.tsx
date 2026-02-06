@@ -170,7 +170,7 @@ export default function NewTransactionPage() {
                 <Input
                   id="amount"
                   type="number"
-                  step="1"
+                  step="0.01"
                   min="0"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
