@@ -34,8 +34,17 @@ export interface Transaction {
   date: string;
   is_split: boolean;
   original_amount: string | null;
+  paid_by_user_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface SettlementData {
+  my_paid: string;
+  partner_paid: string;
+  total: string;
+  settlement_amount: string;
+  i_pay_partner: boolean;
 }
 
 export interface TransactionSummary {

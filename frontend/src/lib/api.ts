@@ -168,6 +168,10 @@ export const coupleApi = {
     api.post('/api/couples/join', { invite_code: inviteCode }),
   getMyCouple: () => api.get('/api/couples/me'),
   leaveCouple: () => api.delete('/api/couples/me'),
+  getSettlement: (params?: {
+    start_date?: string;
+    end_date?: string;
+  }) => api.get('/api/couples/settlement', { params }),
 };
 
 // Transaction endpoints

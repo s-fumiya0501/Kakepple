@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { transactionApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { PaidBySelector } from '@/components/PaidBySelector';
 import {
   Plus,
   ShoppingCart,
@@ -65,6 +66,7 @@ export function QuickInputFAB() {
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [isSplit, setIsSplit] = useState(false);
+  const [paidBy, setPaidBy] = useState('');
   const [loading, setLoading] = useState(false);
   const [quickCategories, setQuickCategories] = useState<QuickCategory[]>(defaultQuickCategories);
 
@@ -85,7 +87,8 @@ export function QuickInputFAB() {
     setAmount('');
     setDescription('');
     setIsSplit(false);
-  }, []);
+    setPaidBy(user?.id || '');
+  }, [user?.id]);
 
   const handleOpen = useCallback(() => {
     resetState();
@@ -103,13 +106,15 @@ export function QuickInputFAB() {
     setLoading(true);
     try {
       const today = new Date().toISOString().split('T')[0];
+      const splitEnabled = isSplit && couple !== null;
       await transactionApi.create({
         type: 'expense',
         category: selectedCategory,
         amount: parseFloat(amount),
         date: today,
         description: description || '',
-        is_split: isSplit && couple !== null,
+        is_split: splitEnabled,
+        ...(splitEnabled && paidBy ? { paid_by_user_id: paidBy } : {}),
       });
 
       toast({
@@ -130,7 +135,7 @@ export function QuickInputFAB() {
     } finally {
       setLoading(false);
     }
-  }, [amount, selectedCategory, description, isSplit, couple, resetState]);
+  }, [amount, selectedCategory, description, isSplit, paidBy, couple, resetState]);
 
   // Don't show FAB on auth pages or if not logged in
   if (!user || HIDDEN_PATHS.includes(pathname || '')) {
@@ -240,17 +245,30 @@ export function QuickInputFAB() {
                 </div>
                 {/* Split toggle */}
                 {couple && (
-                  <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white text-sm">割り勘にする</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
-                        パートナーと半額ずつ
-                      </p>
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white text-sm">割り勘にする</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          パートナーと半額ずつ
+                        </p>
+                      </div>
+                      <Switch
+                        checked={isSplit}
+                        onCheckedChange={(checked) => {
+                          setIsSplit(checked);
+                          if (checked) setPaidBy(user?.id || '');
+                        }}
+                      />
                     </div>
-                    <Switch
-                      checked={isSplit}
-                      onCheckedChange={setIsSplit}
-                    />
+                    {isSplit && user && (
+                      <PaidBySelector
+                        couple={couple}
+                        userId={user.id}
+                        value={paidBy}
+                        onChange={setPaidBy}
+                      />
+                    )}
                   </div>
                 )}
               </div>

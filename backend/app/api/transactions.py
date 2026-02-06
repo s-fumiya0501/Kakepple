@@ -76,6 +76,9 @@ async def create_transaction(
         original_amount = data.amount
         split_amount = original_amount / 2
 
+        # Determine who actually paid (default: current user)
+        paid_by = data.paid_by_user_id if data.paid_by_user_id else current_user.id
+
         # Create transaction for current user (half amount)
         user_transaction = Transaction(
             user_id=current_user.id,
@@ -86,7 +89,8 @@ async def create_transaction(
             original_amount=original_amount,
             description=data.description,
             date=data.date,
-            is_split=True
+            is_split=True,
+            paid_by_user_id=paid_by,
         )
         db.add(user_transaction)
 
@@ -102,7 +106,8 @@ async def create_transaction(
                 original_amount=original_amount,
                 description=f"{data.description} (割り勘)" if data.description else "(割り勘)",
                 date=data.date,
-                is_split=True
+                is_split=True,
+                paid_by_user_id=paid_by,
             )
             db.add(partner_transaction)
 
